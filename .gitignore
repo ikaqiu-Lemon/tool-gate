@@ -1,0 +1,108 @@
+# ------------------------------
+# OS / editor noise
+# ------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+.idea/
+.vscode/
+*.code-workspace
+
+# Vim / Emacs temp files
+*.swp
+*.swo
+*~
+
+# ------------------------------
+# Git internals (never commit)
+# ------------------------------
+.git/
+
+# ------------------------------
+# Python bytecode / caches
+# ------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.pyre/
+.hypothesis/
+.tox/
+.nox/
+
+# ------------------------------
+# Python build / packaging
+# ------------------------------
+build/
+dist/
+site/
+.eggs/
+*.egg
+*.egg-info/
+pip-wheel-metadata/
+
+# ------------------------------
+# Virtual environments
+# ------------------------------
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# ------------------------------
+# Test / coverage outputs
+# ------------------------------
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+coverage/
+
+# ------------------------------
+# Runtime logs / local state
+# ------------------------------
+*.log
+*.pid
+*.pid.lock
+*.out
+*.err
+*.sqlite
+*.sqlite3
+*.db
+
+# Claude plugin local runtime data
+.claude_plugin_data/
+
+# ------------------------------
+# Temporary files
+# ------------------------------
+tmp/
+temp/
+*.tmp
+*.bak
+
+# ------------------------------
+# Optional local env files
+# ------------------------------
+.env
+.env.*
+!.env.example
+
+# ------------------------------
+# Keep project-level AI/OpenSpec assets tracked
+# ------------------------------
+# Do NOT ignore these if they are part of the repository design:
+# .claude/
+# .cursor/
+# .codex/
+# .trae/
+# openspec/
+# skills/
+# hooks/
+# .claude-plugin/
+# .mcp.json

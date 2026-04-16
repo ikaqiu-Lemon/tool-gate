@@ -1,0 +1,63 @@
+[project]
+name = "tool-governance"
+version = "0.1.0"
+description = "Runtime tool governance for Claude Code: progressive disclosure, dynamic authorization, and lifecycle management."
+requires-python = ">=3.10"
+license = "MIT"
+
+dependencies = [
+    "mcp>=1.2.0",
+    "pydantic>=2.0",
+    "langchain-core>=0.3",
+    "cachetools>=5.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+server = [
+    "fastapi>=0.100",
+    "uvicorn>=0.20",
+]
+observability = [
+    "langfuse>=2.0",
+]
+dev = [
+    "pytest>=7.0,<9.0",
+    "pytest-asyncio>=0.23,<1.0",
+    "ruff>=0.8,<1.0",
+    "mypy>=1.0,<2.0",
+    "types-cachetools",
+    "types-PyYAML",
+]
+
+[project.scripts]
+tg-hook = "tool_governance.hook_handler:main"
+tg-mcp = "tool_governance.mcp_server:main"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "tool_governance.mcp_server"
+disallow_untyped_decorators = false
+
+[[tool.mypy.overrides]]
+module = "tool_governance.tools.*"
+disallow_untyped_decorators = false

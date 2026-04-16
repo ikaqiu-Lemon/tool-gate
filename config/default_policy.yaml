@@ -1,0 +1,16 @@
+# Default governance policy configuration
+# See docs/需求文档.md S4.4 and models/policy.py for schema
+
+default_risk_thresholds:
+  low: auto        # Auto-grant, no reason required
+  medium: reason   # Requires a reason string
+  high: approval   # Requires user confirmation
+
+default_ttl: 3600      # Default grant TTL in seconds (1 hour)
+default_scope: session  # Default grant scope: "session" or "turn"
+
+# Per-skill policy overrides (empty by default)
+skill_policies: {}
+
+# Globally blocked tools (empty by default)
+blocked_tools: []

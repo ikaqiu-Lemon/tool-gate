@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "tool-governance": {
+      "command": "tg-mcp",
+      "env": {
+        "GOVERNANCE_DATA_DIR": "${CLAUDE_PLUGIN_DATA}",
+        "GOVERNANCE_SKILLS_DIR": "${CLAUDE_PLUGIN_ROOT}/skills",
+        "GOVERNANCE_CONFIG_DIR": "${CLAUDE_PLUGIN_ROOT}/config"
+      }
+    }
+  }
+}

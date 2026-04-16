@@ -1,0 +1,36 @@
+schema: spec-driven
+
+context: |
+  Canonical project documents live in docs/ and must stay in sync:
+  - docs/requirements.md = accepted product and engineering requirements
+  - docs/technical_design.md = accepted architecture and implementation design
+  - docs/dev_plan.md = current phased execution plan and progress
+
+  This repository is a Claude Code plugin project.
+  During development, OpenSpec change artifacts are temporary working documents.
+  The long-lived source of truth is docs/.
+
+  Documentation sync policy:
+  - Read docs/requirements.md, docs/technical_design.md, docs/dev_plan.md before drafting any artifact
+  - Do not invent scope beyond accepted docs unless clearly marked as a proposed change
+  - After each accepted change or implementation phase, sync relevant updates back into docs/
+  - Keep docs concise and cumulative; keep OpenSpec artifacts change-specific
+
+rules:
+  proposal:
+    - Read docs/requirements.md, docs/technical_design.md, and docs/dev_plan.md first
+    - If proposal conflicts with docs/, list the conflict explicitly
+    - Separate accepted scope from proposed scope
+
+  specs:
+    - Extract requirement deltas that must later be synced into docs/requirements.md
+    - Preserve existing terminology and boundaries from docs/requirements.md
+
+  design:
+    - Extract architecture/design deltas that must later be synced into docs/technical_design.md
+    - Reuse existing plugin structure and module boundaries unless the change explicitly revises them
+
+  tasks:
+    - Organize implementation by the project phases in docs/dev_plan.md
+    - Every implementation batch must state which docs files need syncing afterward
+    - Do not treat docs sync as optional

@@ -174,7 +174,7 @@ async def disable_skill(skill_id: str) -> dict[str, Any]:
 
     grant = state.active_grants.get(skill_id)
     if grant:
-        rt.grant_manager.revoke_grant(grant.grant_id)
+        rt.grant_manager.revoke_grant(grant.grant_id, reason="explicit")
 
     rt.state_manager.remove_from_skills_loaded(state, skill_id)
     rt.tool_rewriter.recompute_active_tools(state)
@@ -208,9 +208,11 @@ async def run_skill_action(skill_id: str, op: str, args: dict[str, Any] | None =
               ``{"error": str(e)}``.  The caller cannot distinguish
               a handler that intentionally returned an error dict
               from one that crashed.
-            - If ``skill_id`` is loaded but has no metadata (``meta``
-              is ``None``), the ``allowed_ops`` check is skipped
-              entirely and the operation proceeds unchecked.
+
+        Denies:
+            - If ``skill_id`` is loaded but has no metadata
+              (``meta`` is ``None``), the call is denied
+              (``meta_missing``) without dispatching.
     """
     rt = _get_runtime()
     sid = _session_id()
@@ -222,10 +224,17 @@ async def run_skill_action(skill_id: str, op: str, args: dict[str, Any] | None =
     if not rt.grant_manager.is_grant_valid(sid, skill_id):
         return {"error": f"Grant for '{skill_id}' has expired. Re-enable the skill."}
 
-    # NB: if meta is None the allowed_ops guard is bypassed — any op
-    # is accepted for a loaded skill with missing metadata.
+    # Deny-by-default when metadata is unresolved: we cannot evaluate
+    # allowed_ops without it, so dispatching would bypass the guard.
     meta = state.skills_metadata.get(skill_id)
-    if meta and op not in meta.allowed_ops:
+    if meta is None:
+        rt.store.append_audit(
+            sid, "skill.action.deny", skill_id=skill_id,
+            detail={"op": op, "reason": "meta_missing"},
+        )
+        return {"error": f"Skill '{skill_id}' metadata unavailable; operation denied"}
+
+    if op not in meta.allowed_ops:
         return {"error": f"Operation '{op}' is not in allowed_ops for '{skill_id}'"}
 
     from tool_governance.core.skill_executor import dispatch
@@ -275,19 +284,16 @@ async def change_stage(skill_id: str, stage_id: str) -> dict[str, Any]:
 async def refresh_skills() -> dict[str, Any]:
     """Force-refresh the skill index (clear caches, rescan directory).
 
-    .. note:: ``rt.indexer.refresh()`` already calls ``build_index()``
-       internally, so the subsequent ``rt.indexer.build_index()`` call
-       re-scans the directory a second time.  The returned ``count``
-       reflects the first scan; ``state.skills_metadata`` reflects the
-       second (they should be identical unless the filesystem changed
-       between the two calls).
+    Performs exactly one directory scan per call: ``refresh()``
+    clears the content cache and rebuilds the internal index, and
+    the current state is then read back via ``current_index()``
+    without a second rescan.
     """
     rt = _get_runtime()
     sid = _session_id()
     state = rt.state_manager.load_or_init(sid)
     count = rt.indexer.refresh()
-    # Second scan — redundant with the one inside refresh(); see note.
-    state.skills_metadata = rt.indexer.build_index()
+    state.skills_metadata = rt.indexer.current_index()
     rt.state_manager.save(state)
     return {"refreshed": True, "skill_count": count}
 

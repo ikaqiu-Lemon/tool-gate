@@ -54,6 +54,58 @@ class TestRevoke:
         active = mgr.get_active_grants("s1")
         assert len(active) == 0
 
+    def test_revoke_emits_grant_revoke_audit(self, mgr: GrantManager, store: SQLiteStore) -> None:
+        """D7: ``revoke_grant`` must emit a ``grant.revoke`` audit
+        record carrying ``session_id``, ``skill_id``, ``grant_id`` and
+        ``detail.reason``.  The default reason is ``"explicit"``."""
+        import json as _json
+
+        grant = mgr.create_grant("s1", "repo-read", [])
+        mgr.revoke_grant(grant.grant_id)
+
+        events = store.query_audit(session_id="s1", event_type="grant.revoke")
+        assert len(events) == 1
+        ev = events[0]
+        assert ev["skill_id"] == "repo-read"
+        detail = _json.loads(ev["detail"])
+        assert detail == {"grant_id": grant.grant_id, "reason": "explicit"}
+
+    def test_revoke_with_custom_reason(self, mgr: GrantManager, store: SQLiteStore) -> None:
+        """The ``reason`` discriminator is passed through to the audit
+        event, allowing future revoke-paths (e.g. turn/session scope
+        revocation) to tag their reason distinctly."""
+        import json as _json
+
+        grant = mgr.create_grant("s1", "repo-read", [])
+        mgr.revoke_grant(grant.grant_id, reason="turn")
+
+        events = store.query_audit(session_id="s1", event_type="grant.revoke")
+        assert len(events) == 1
+        assert _json.loads(events[0]["detail"])["reason"] == "turn"
+
+    def test_revoke_unknown_grant_id_emits_no_audit(self, mgr: GrantManager, store: SQLiteStore) -> None:
+        """Revoking a non-existent ``grant_id`` is a silent no-op
+        both for the status update and for the audit event."""
+        mgr.revoke_grant("does-not-exist")
+        events = store.query_audit(event_type="grant.revoke")
+        assert events == []
+
+    def test_cleanup_expired_does_not_emit_grant_revoke(self, mgr: GrantManager, store: SQLiteStore) -> None:
+        """D7 event-boundary: TTL expiry goes through
+        ``cleanup_expired`` (status → ``"expired"``), not
+        ``revoke_grant``.  No ``grant.revoke`` must be emitted when a
+        grant expires — ``grant.expire`` is the correct event and
+        fires elsewhere (hook_handler)."""
+        past = datetime.utcnow() - timedelta(seconds=10)
+        with patch("tool_governance.core.grant_manager.datetime") as mock_dt:
+            mock_dt.utcnow.return_value = past
+            mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+            mgr.create_grant("s1", "repo-read", [], ttl=1)
+
+        mgr.cleanup_expired("s1")
+        events = store.query_audit(session_id="s1", event_type="grant.revoke")
+        assert events == []
+
 
 class TestCleanupExpired:
     def test_cleanup_expired(self, mgr: GrantManager) -> None:

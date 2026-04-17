@@ -104,19 +104,17 @@ class StateManager:
             )
 
     def remove_from_skills_loaded(self, state: SessionState, skill_id: str) -> None:
-        """Remove a skill from the loaded set.
+        """Remove a skill from the loaded set and its grant (if any).
 
-        Also attempts to remove a matching key from ``active_grants``.
-
-        .. note:: ``active_grants`` is keyed by **grant_id**, not
-           skill_id.  This pop only works when grant_id happens to
-           equal skill_id — otherwise the grant is orphaned.  This
-           may be a latent bug; see ``active_grants`` in
-           ``state.py``.
+        ``state.active_grants`` is keyed by **skill_id** — see
+        ``models/state.py::SessionState.active_grants``.  At most one
+        active Grant exists per ``(session_id, skill_id)`` pair, so a
+        single ``pop(skill_id, None)`` is sufficient to detach the
+        grant record from the session state.  The authoritative
+        ``grant_id`` lives inside the stored ``Grant`` object and on
+        the DB row, not as the dict key.
         """
         state.skills_loaded.pop(skill_id, None)
-        # NB: active_grants is keyed by grant_id — this only cleans up
-        # a grant whose grant_id == skill_id.
         state.active_grants.pop(skill_id, None)
 
     def get_active_tools(self, state: SessionState) -> list[str]:

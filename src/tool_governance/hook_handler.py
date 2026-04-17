@@ -212,7 +212,9 @@ def handle_post_tool_use(input_data: dict[str, Any]) -> dict[str, Any]:
 
     Scans loaded skills to find which one owns the tool that was
     just used, then stamps ``last_used_at`` on the corresponding
-    ``LoadedSkillInfo``.
+    ``LoadedSkillInfo``.  Exactly one skill is stamped per event —
+    the first match wins, top-level ``allowed_tools`` taking
+    precedence over stage-level.
 
     Contract:
         Silences:
@@ -221,15 +223,6 @@ def handle_post_tool_use(input_data: dict[str, Any]) -> dict[str, Any]:
               error is raised; the audit log still records the call.
             - Missing ``tool_name`` in ``input_data`` silently
               defaults to ``""``.
-
-    .. note:: **Latent bug** — the inner ``break`` on the stage
-       match only exits the stage loop, not the outer skill loop.
-       If the tool is found in a stage's ``allowed_tools``, the
-       outer loop continues to the next skill instead of stopping.
-       The ``last_used_at`` is still set correctly for the matching
-       skill, but unnecessary iterations occur and a later skill
-       with the same tool in its top-level ``allowed_tools`` could
-       overwrite the timestamp.
     """
     rt = _get_runtime()
     session_id = discover_session_id(input_data)
@@ -237,19 +230,27 @@ def handle_post_tool_use(input_data: dict[str, Any]) -> dict[str, Any]:
 
     state = rt.state_manager.load_or_init(session_id)
 
-    # Find which skill owns this tool and update last_used_at.
-    # Checks top-level allowed_tools first, then stage-level.
+    # Find which skill owns this tool and stamp last_used_at on
+    # exactly one skill (top-level match beats stage-level; first
+    # skill iterated wins).  A later skill with the same tool must
+    # not overwrite the timestamp.
+    matched = False
     for skill_id, loaded in state.skills_loaded.items():
         meta = state.skills_metadata.get(skill_id)
-        if meta and tool_name in meta.allowed_tools:
+        if not meta:
+            continue
+        if tool_name in meta.allowed_tools:
             loaded.last_used_at = datetime.utcnow()
+            matched = True
             break
-        # NB: inner break only exits the stage loop — see docstring note.
-        if meta and meta.stages:
+        if meta.stages:
             for stage in meta.stages:
                 if tool_name in stage.allowed_tools:
                     loaded.last_used_at = datetime.utcnow()
+                    matched = True
                     break
+            if matched:
+                break
 
     rt.state_manager.save(state)
     rt.store.append_audit(session_id, "tool.call", tool_name=tool_name, decision="allow")

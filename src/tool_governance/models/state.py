@@ -42,7 +42,12 @@ class SessionState(BaseModel):
     # Union of tools permitted by all active grants; recomputed on
     # enable/disable/stage-change.
     active_tools: list[str] = Field(default_factory=list)
-    # grant_id -> Grant for every non-expired, non-revoked grant.
+    # skill_id -> Grant for every non-expired, non-revoked grant.
+    # Invariant: at most one active Grant per (session_id, skill_id);
+    # re-enabling a skill overwrites the previous entry.  The
+    # ``Grant.grant_id`` inside each value is the authoritative
+    # identifier for audit records; the dict key is the lookup handle
+    # used by enable/disable/run_skill_action.
     active_grants: dict[str, Grant] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)

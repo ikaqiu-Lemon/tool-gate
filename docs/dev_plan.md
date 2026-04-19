@@ -461,10 +461,31 @@ Scaffolding  Core Logic   Plugin       Testing &
 | D9  | deferred | backlog  | tracked in `openspec/changes/phase13-hardening-and-doc-sync/` proposal §"Out of Scope"; not implemented this round |
 | D10 | deferred | backlog  | same as D9 |
 
-### Remaining work tracked by `openspec/changes/phase13-hardening-and-doc-sync/`
+### Close-out
 
-- Stage D (re-review prep + closeout) — **pending**
-- Backlog only (not this round): D9, D10, Phase 4 items
+- **phase13-hardening-and-doc-sync closed on 2026-04-19**; D1–D4, D6, D7
+  fixed; D5, D8 doc-synced; D9, D10 deferred; Phase 4 not started.
+- Stage D (re-review prep + closeout) — **done** (`closeout.md`,
+  `review-inputs.md` landed; `openspec validate` passed; full suite
+  167/167 green at re-verify time, closeout baseline 122 at commit
+  `de787c7`).
+- Backlog only (not this round): D9, D10, Phase 4 items.
+
+### Functional test harness — `openspec/changes/add-functional-test-plan/`
+
+> Added 2026-04-18. Stages A–H landed; functional 45/45 green, full
+> suite 167/167. Policy fixtures (`tests/fixtures/policies/*.yaml`)
+> now drive a real `bootstrap.load_policy` → `PolicyEngine` path —
+> `test_functional_policy_fixtures.py`, `test_functional_policy_e2e.py`
+> and `test_functional_policy_e2e_lifecycle.py` prove low / medium /
+> high / `blocked_tools` / skill-specific override branches end-to-end
+> without patching the engine. Subprocess smoke lane
+> (`test_functional_smoke_subprocess.py`) exercises `tg-mcp` (8 meta-
+> tools), `mock_sensitive_stdio`, and three `tg-hook` event contracts.
+> **This is a test-harness enhancement, not a production feature
+> expansion** — no `src/tool_governance/` changes landed in this
+> round. See [`tests/functional/README.md`](../tests/functional/README.md)
+> for the full coverage tables.
 
 ---
 

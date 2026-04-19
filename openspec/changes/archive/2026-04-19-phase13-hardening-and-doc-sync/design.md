@@ -182,6 +182,13 @@ The two events have different semantics and can co-occur for the same
 - A TTL/turn/session sweep that removes a stale grant produces
   **`grant.revoke` only** (no `skill.disable`, because the user did not
   initiate a disable).
+  - **Superseded (2026-04-17)**: the final implementation keeps TTL
+    expiry on the pre-existing `grant.expire` event and does **not**
+    route `cleanup_expired` through `revoke_grant`. `grant.revoke` and
+    `grant.expire` are non-overlapping. See
+    `docs/technical_design.md` §"Stage B — grant.revoke audit event
+    (D7)" and the `test_cleanup_expired_does_not_emit_grant_revoke`
+    test for the final boundary.
 - Calling `disable_skill` on a skill whose grant was already expired and
   cleaned up produces **`skill.disable` only** (the revoke step is a no-op and
   emits nothing).

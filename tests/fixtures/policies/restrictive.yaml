@@ -1,0 +1,43 @@
+# Restrictive functional-test policy.
+#
+# What this fixture proves:
+#   1. high-risk -> unconditional deny.  Encoded via blocked_tools using
+#      the skill_id denylist path inside PolicyEngine.evaluate (step 1).
+#      Rationale: PolicyEngine does not recognise "denied" as a
+#      threshold value; the blocked_tools entry is the only route that
+#      yields decision="denied" deterministically.  See design.md
+#      §Extension §1 mapping notes.
+#   2. Global blocked_tools strip a tool from active_tools even after a
+#      successful enable_skill.  Achieved by listing `mock_ping` — a
+#      TOOL name owned by mock_ttl — in the same blocked_tools list.
+#      ToolRewriter is wired from `policy.blocked_tools` by bootstrap
+#      (src/tool_governance/bootstrap.py line ~115), so the one list
+#      serves two roles (pre-existing production semantics).
+#   3. Skill-specific override beats risk-level default.  `mock_readonly`
+#      is risk_level=low and would auto-grant under default rules, but
+#      this policy forces `approval_required=true` on it.
+default_risk_thresholds:
+  low: auto
+  medium: approval
+  high: approval
+default_ttl: 600
+default_scope: session
+blocked_tools:
+  - mock_sensitive      # skill-id route: PolicyEngine denies enable of this skill
+  - mock_ping           # tool-name route: ToolRewriter strips from active_tools
+skill_policies:
+  mock_readonly:
+    skill_id: mock_readonly
+    auto_grant: false
+    require_reason: false
+    approval_required: true
+    max_ttl: 120
+  mock_stageful:
+    # Override test: force the require_reason branch. Without reason
+    # PolicyEngine returns decision="reason_required"; with reason it
+    # returns decision="auto" (policy_engine.py §skill-specific step).
+    skill_id: mock_stageful
+    auto_grant: false
+    require_reason: true
+    approval_required: false
+    max_ttl: 300

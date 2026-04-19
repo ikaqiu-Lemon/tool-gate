@@ -13,6 +13,7 @@ from pathlib import Path
 import yaml
 
 from tool_governance.core.grant_manager import GrantManager
+from tool_governance.core.observability import LangfuseTracer, create_tracer
 from tool_governance.core.policy_engine import PolicyEngine
 from tool_governance.core.prompt_composer import PromptComposer
 from tool_governance.core.skill_indexer import SkillIndexer
@@ -40,6 +41,7 @@ class GovernanceRuntime:
         tool_rewriter: ToolRewriter,
         prompt_composer: PromptComposer,
         policy: GovernancePolicy,
+        tracer: LangfuseTracer | None = None,
     ) -> None:
         self.store = store
         self.indexer = indexer
@@ -49,6 +51,7 @@ class GovernanceRuntime:
         self.tool_rewriter = tool_rewriter
         self.prompt_composer = prompt_composer
         self.policy = policy
+        self.tracer = tracer or LangfuseTracer(client=None)
 
 
 def load_policy(config_dir: str | Path) -> GovernancePolicy:
@@ -102,7 +105,8 @@ def create_governance_runtime(
               no way to know the policy was loaded from a fallback
               location.
     """
-    store = SQLiteStore(data_dir)
+    tracer = create_tracer()
+    store = SQLiteStore(data_dir, tracer=tracer)
     cache = VersionedTTLCache(maxsize=100, ttl=300)
     indexer = SkillIndexer(skills_dir, cache)
     state_manager = StateManager(store)
@@ -124,4 +128,5 @@ def create_governance_runtime(
         tool_rewriter=tool_rewriter,
         prompt_composer=prompt_composer,
         policy=policy,
+        tracer=tracer,
     )

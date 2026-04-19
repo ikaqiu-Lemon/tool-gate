@@ -147,6 +147,66 @@ def handle_user_prompt_submit(input_data: dict[str, Any]) -> dict[str, Any]:
     return {"additionalContext": context}
 
 
+def _is_error_response(tool_response: Any) -> bool:
+    """Return True if the PostToolUse tool_response signals a failure.
+
+    Recognises the two common error shapes seen across Claude Code
+    tools: a dict with a truthy ``is_error`` flag or a non-empty
+    ``error`` field.  Non-dict responses never signal failure here.
+    """
+    if not isinstance(tool_response, dict):
+        return False
+    if tool_response.get("is_error"):
+        return True
+    err = tool_response.get("error")
+    return bool(err) and err != ""
+
+
+def _classify_deny_bucket(tool_name: str, state: Any) -> str:
+    """Return the ``error_bucket`` for a PreToolUse deny decision.
+
+    Matches the spec's two gate-time buckets:
+
+    - ``wrong_skill_tool``: at least one skill IS enabled, the tool is
+      not in any enabled skill's ``allowed_tools`` (top-level or stage),
+      but it IS in some *other* indexed skill's ``allowed_tools`` — the
+      model picked a known tool without enabling the skill that owns it.
+    - ``whitelist_violation``: every other deny — no skill is enabled
+      at all, the tool is unknown to every indexed skill, or the tool
+      belongs to an enabled skill but was stripped from ``active_tools``
+      by policy (e.g. ``blocked_tools`` or stage gating).
+
+    The third bucket (``parameter_error``) is not gate-detectable; it is
+    classified in :func:`handle_post_tool_use` when the tool response
+    carries an error signal.
+    """
+    if not state.skills_loaded:
+        return "whitelist_violation"
+
+    enabled_skill_ids = set(state.skills_loaded.keys())
+
+    for skill_id in enabled_skill_ids:
+        meta = state.skills_metadata.get(skill_id)
+        if not meta:
+            continue
+        if tool_name in meta.allowed_tools:
+            return "whitelist_violation"
+        for stage in meta.stages or []:
+            if tool_name in stage.allowed_tools:
+                return "whitelist_violation"
+
+    for skill_id, meta in state.skills_metadata.items():
+        if not meta or skill_id in enabled_skill_ids:
+            continue
+        if tool_name in meta.allowed_tools:
+            return "wrong_skill_tool"
+        for stage in meta.stages or []:
+            if tool_name in stage.allowed_tools:
+                return "wrong_skill_tool"
+
+    return "whitelist_violation"
+
+
 def handle_pre_tool_use(input_data: dict[str, Any]) -> dict[str, Any]:
     """PreToolUse: gate-check a tool against active_tools.
 
@@ -189,8 +249,9 @@ def handle_pre_tool_use(input_data: dict[str, Any]) -> dict[str, Any]:
             }
         }
 
+    bucket = _classify_deny_bucket(tool_name, state)
     rt.store.append_audit(session_id, "tool.call", tool_name=tool_name, decision="deny",
-                          detail={"error_bucket": "whitelist_violation"})
+                          detail={"error_bucket": bucket})
     return {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
@@ -253,7 +314,12 @@ def handle_post_tool_use(input_data: dict[str, Any]) -> dict[str, Any]:
                 break
 
     rt.state_manager.save(state)
-    rt.store.append_audit(session_id, "tool.call", tool_name=tool_name, decision="allow")
+    tool_response = input_data.get("tool_response")
+    if _is_error_response(tool_response):
+        rt.store.append_audit(session_id, "tool.call", tool_name=tool_name, decision="error",
+                              detail={"error_bucket": "parameter_error"})
+    else:
+        rt.store.append_audit(session_id, "tool.call", tool_name=tool_name, decision="allow")
     return {}
 
 

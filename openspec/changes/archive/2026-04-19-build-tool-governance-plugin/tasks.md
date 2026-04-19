@@ -50,16 +50,16 @@
 
 ## 4. Phase 4 — Observability, E2E Testing + Docs
 
-- [ ] 4.1 Implement structured audit logging: ensure all 9 event types (skill.list, skill.read, skill.enable, skill.disable, tool.call, grant.expire, grant.revoke, stage.change, prompt.submit) recorded with consistent fields
-- [ ] 4.2 Implement funnel metrics support: ensure audit_log queries can produce shown→read→enable→tool counts per session and per skill
-- [ ] 4.3 Implement misuse call bucketing: classify denied tool calls into whitelist_violation, wrong_skill_tool, parameter_error; record error_bucket in audit detail
-- [ ] 4.4 Implement optional Langfuse integration: conditional import, session→trace mapping, observation per skill operation, graceful fallback when langfuse not installed
-- [ ] 4.5 E2E test suite: full 8-step governance chain, multi-skill concurrent enable, stage switching with active_tools verification
-- [ ] 4.6 Security/boundary tests: deny unauthorized tool call, TTL expiration cleanup, turn-scoped grant expiry, blocked skill rejection, max TTL capping
-- [ ] 4.7 Performance benchmarks: measure hook handler latency (target <50ms), MCP tool response time (target <100ms), cache hit rate (target >95%); record results
-- [ ] 4.8 Code quality: ruff lint pass, mypy type check pass, test coverage report (target >80% for core modules)
-- [ ] 4.9 Write README.md: installation guide, configuration, usage tutorial, architecture diagram, core chain explanation
-- [ ] 4.10 Write CHANGELOG.md, finalize version number in pyproject.toml and plugin.json
+- [x] 4.1 Implement structured audit logging: ensure all 9 event types (skill.list, skill.read, skill.enable, skill.disable, tool.call, grant.expire, grant.revoke, stage.change, prompt.submit) recorded with consistent fields
+- [x] 4.2 Implement funnel metrics support: ensure audit_log queries can produce shown→read→enable→tool counts per session and per skill
+- [x] 4.3 Implement misuse call bucketing: classify denied tool calls into whitelist_violation, wrong_skill_tool, parameter_error; record error_bucket in audit detail
+- [x] 4.4 Implement optional Langfuse integration: conditional import, session→trace mapping, observation per skill operation, graceful fallback when langfuse not installed
+- [x] 4.5 E2E test suite: full 8-step governance chain, multi-skill concurrent enable, stage switching with active_tools verification
+- [x] 4.6 Security/boundary tests: deny unauthorized tool call, TTL expiration cleanup, turn-scoped grant expiry, blocked skill rejection, max TTL capping
+- [x] 4.7 Performance benchmarks: measure hook handler latency (target <50ms), MCP tool response time (target <100ms), cache hit rate (target >95%); record results
+- [x] 4.8 Code quality: ruff lint pass, mypy type check pass, test coverage report (target >80% for core modules)
+- [x] 4.9 Write README.md: installation guide, configuration, usage tutorial, architecture diagram, core chain explanation
+- [x] 4.10 Write CHANGELOG.md, finalize version number in pyproject.toml and plugin.json
 
 > **Docs sync after Phase 4**:
 > - `docs/技术方案文档.md` S6: Add performance benchmark results (actual hook latency, cache hit rate)

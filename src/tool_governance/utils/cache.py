@@ -22,6 +22,8 @@ class VersionedTTLCache:
 
     def __init__(self, maxsize: int = 100, ttl: float = 300) -> None:
         self._cache: TTLCache[str, Any] = TTLCache(maxsize=maxsize, ttl=ttl)
+        self.hits = 0
+        self.misses = 0
 
     # ------------------------------------------------------------------
     # Key helpers
@@ -67,7 +69,12 @@ class VersionedTTLCache:
 
     def get(self, key: str) -> Any | None:
         """Return the cached value for *key*, or None on miss/expiry."""
-        return self._cache.get(key)
+        value = self._cache.get(key)
+        if value is None:
+            self.misses += 1
+        else:
+            self.hits += 1
+        return value
 
     def put(self, key: str, value: Any) -> None:
         """Insert or overwrite *key* in the cache.

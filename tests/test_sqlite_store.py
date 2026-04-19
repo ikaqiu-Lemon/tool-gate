@@ -109,3 +109,48 @@ class TestAudit:
         store.append_audit("s1", "tool.call", detail={"error_bucket": "whitelist_violation"})
         rows = store.query_audit(session_id="s1")
         assert '"whitelist_violation"' in rows[0]["detail"]
+
+
+class TestFunnelCounts:
+    def _seed(self, store: SQLiteStore) -> None:
+        # Session s1 — full funnel for skill A, plus noise.
+        store.append_audit("s1", "skill.list")
+        store.append_audit("s1", "skill.list")
+        store.append_audit("s1", "skill.read", skill_id="A")
+        store.append_audit("s1", "skill.read", skill_id="B")
+        store.append_audit("s1", "skill.enable", skill_id="A", decision="granted")
+        store.append_audit("s1", "skill.enable", skill_id="B", decision="reason_required")
+        store.append_audit("s1", "tool.call", tool_name="Read", decision="allow")
+        store.append_audit("s1", "tool.call", tool_name="Edit", decision="deny")
+        # Session s2 — unrelated, must not bleed into per-session queries.
+        store.append_audit("s2", "skill.list")
+        store.append_audit("s2", "skill.enable", skill_id="A", decision="granted")
+
+    def test_session_scope_aggregates_stages(self, store: SQLiteStore) -> None:
+        self._seed(store)
+        counts = store.funnel_counts(session_id="s1")
+        assert counts == {"shown": 2, "read": 2, "enable": 1, "tool_calls": 1}
+
+    def test_skill_filter_narrows_read_and_enable(self, store: SQLiteStore) -> None:
+        self._seed(store)
+        counts = store.funnel_counts(session_id="s1", skill_id="A")
+        assert counts["read"] == 1
+        assert counts["enable"] == 1
+        assert counts["shown"] == 2
+        assert counts["tool_calls"] == 1
+
+    def test_rejected_enables_do_not_count(self, store: SQLiteStore) -> None:
+        self._seed(store)
+        counts = store.funnel_counts(session_id="s1", skill_id="B")
+        assert counts["enable"] == 0
+
+    def test_global_scope_sums_all_sessions(self, store: SQLiteStore) -> None:
+        self._seed(store)
+        counts = store.funnel_counts()
+        assert counts["shown"] == 3
+        assert counts["enable"] == 2
+        assert counts["tool_calls"] == 1
+
+    def test_empty_log_returns_zeros(self, store: SQLiteStore) -> None:
+        counts = store.funnel_counts(session_id="missing")
+        assert counts == {"shown": 0, "read": 0, "enable": 0, "tool_calls": 0}

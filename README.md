@@ -13,7 +13,7 @@ Control what Claude can see, enable, and use — with **progressive disclosure**
   <img alt="Claude Code Plugin" src="https://img.shields.io/badge/Claude%20Code-Plugin-6f42c1" />
   <img alt="Architecture" src="https://img.shields.io/badge/Architecture-Dual%20Plane-0ea5e9" />
   <img alt="State" src="https://img.shields.io/badge/State-SQLite%20WAL-10b981" />
-  <img alt="Tests" src="https://img.shields.io/badge/Tests-104%2B-success" />
+  <img alt="Tests" src="https://img.shields.io/badge/Tests-190%2B-success" />
 </p>
 
 </div>
@@ -189,9 +189,11 @@ enable_skill("code-edit")
 | Area | Status |
 |---|---|
 | **Phase 1–3 core chain** | In place |
+| **Phase 4 observability + quality** | In place — 9 audit event types, funnel metrics, 3-bucket miscall classification, optional Langfuse, E2E + boundary suites |
 | **Core path** | `index → policy → grant → rewrite → gate` |
-| **Tests** | 104+ passing |
-| **Current focus** | Hardening, consistency cleanup, and doc sync before full Phase 4 |
+| **Tests** | 190+ passing, core module coverage ≥ 92% |
+| **Code quality** | `ruff` clean, `mypy --strict` clean on `src/tool_governance/` |
+| **Benchmarks** | Hook p95 < 1 ms, MCP p95 < 1 ms, skill-index cache hit rate 99.5% (see `docs/perf_results.md`) |
 
 ---
 
@@ -204,16 +206,21 @@ enable_skill("code-edit")
 - Prompt and tool rewrite flow
 - MCP server and hook orchestration
 
-### Layer 2 — In progress
-- Hardening fixes and consistency cleanup
-- Better audit completeness
+### Layer 2 — Done
+- Hardening fixes and consistency cleanup (Phase 13: D1–D8 closed)
+- Better audit completeness (9 canonical event types, `grant.revoke` as a distinct event)
 - Drift cleanup and doc sync
 
-### Layer 3 — Next
-- End-to-end observability
-- Funnel metrics and richer error bucketing
-- Langfuse integration
-- Release polish and Phase 4 completion
+### Layer 3 — Done
+- End-to-end observability (`audit_log` funnel queries via `SQLiteStore.funnel_counts`)
+- Funnel metrics and richer error bucketing (`whitelist_violation` / `wrong_skill_tool` / `parameter_error`)
+- Optional Langfuse integration with graceful no-op fallback
+- Release polish: ruff + mypy + coverage + micro-benchmarks
+
+### Layer 4 — Next
+- Approval workflow UX and mid-turn grant refresh
+- Replay / evaluation harness
+- Live-host E2E (real Claude Code CLI)
 
 ---
 

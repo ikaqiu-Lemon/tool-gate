@@ -1,6 +1,6 @@
 [project]
 name = "tool-governance"
-version = "0.1.0"
+version = "0.2.0"
 description = "Runtime tool governance for Claude Code: progressive disclosure, dynamic authorization, and lifecycle management."
 requires-python = ">=3.10"
 license = "MIT"

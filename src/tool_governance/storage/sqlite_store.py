@@ -65,11 +65,16 @@ class SQLiteStore:
                 cannot be opened / initialised.
     """
 
-    def __init__(self, data_dir: str | Path) -> None:
+    def __init__(
+        self,
+        data_dir: str | Path,
+        tracer: Any | None = None,
+    ) -> None:
         self._data_dir = Path(data_dir)
         # Create the directory tree if it doesn't exist.
         self._data_dir.mkdir(parents=True, exist_ok=True)
         self._db_path = self._data_dir / "governance.db"
+        self._tracer = tracer
         self._init_db()
 
     def _connect(self) -> sqlite3.Connection:
@@ -246,6 +251,18 @@ class SQLiteStore:
                     now,
                 ),
             )
+        if self._tracer is not None:
+            try:
+                self._tracer.emit(
+                    event_type,
+                    session_id,
+                    skill_id=skill_id,
+                    tool_name=tool_name,
+                    decision=decision,
+                    detail=detail,
+                )
+            except Exception:  # noqa: BLE001 — tracing must never break audit
+                pass
 
     def query_audit(
         self,
@@ -278,3 +295,56 @@ class SQLiteStore:
                 params,
             ).fetchall()
         return [dict(r) for r in rows]
+
+    def funnel_counts(
+        self,
+        session_id: str | None = None,
+        skill_id: str | None = None,
+    ) -> dict[str, int]:
+        """Return aggregate funnel-stage counts from the audit log.
+
+        Stages returned:
+
+        - ``shown`` — ``skill.list`` event count (catalog views).
+          Honours ``session_id`` only; ``skill.list`` events do not
+          carry a ``skill_id``, so a per-skill ``shown`` would be
+          meaningless and is therefore returned against the session
+          scope regardless of the ``skill_id`` filter.
+        - ``read`` — ``skill.read`` event count.  Honours both filters.
+        - ``enable`` — ``skill.enable`` events with ``decision='granted'``
+          only (rejected policy decisions do not count as a successful
+          enable).  Honours both filters.
+        - ``tool_calls`` — ``tool.call`` events with ``decision='allow'``.
+          Honours ``session_id`` only; the audit row records the tool
+          name but not the owning skill, so a per-skill filter cannot
+          be applied accurately at query time.
+
+        The ``task`` stage named in the spec description is not yet
+        emitted as an audit event, so it is deliberately omitted from
+        the returned dict.
+        """
+        sql = (
+            "SELECT "
+            "SUM(CASE WHEN event_type = 'skill.list' THEN 1 ELSE 0 END) AS shown, "
+            "SUM(CASE WHEN event_type = 'skill.read' "
+            "          AND (:skill_id IS NULL OR skill_id = :skill_id) "
+            "     THEN 1 ELSE 0 END) AS read, "
+            "SUM(CASE WHEN event_type = 'skill.enable' "
+            "          AND decision = 'granted' "
+            "          AND (:skill_id IS NULL OR skill_id = :skill_id) "
+            "     THEN 1 ELSE 0 END) AS enable, "
+            "SUM(CASE WHEN event_type = 'tool.call' "
+            "          AND decision = 'allow' "
+            "     THEN 1 ELSE 0 END) AS tool_calls "
+            "FROM audit_log "
+            "WHERE (:session_id IS NULL OR session_id = :session_id)"
+        )
+        params = {"session_id": session_id, "skill_id": skill_id}
+        with self._connect() as conn:
+            row = conn.execute(sql, params).fetchone()
+        return {
+            "shown": int(row["shown"] or 0),
+            "read": int(row["read"] or 0),
+            "enable": int(row["enable"] or 0),
+            "tool_calls": int(row["tool_calls"] or 0),
+        }

@@ -1,6 +1,6 @@
 {
   "name": "tool-governance-plugin",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Runtime tool governance for Claude Code: progressive disclosure, dynamic authorization, and lifecycle management.",
   "author": {
     "name": "Tool Governance Team"

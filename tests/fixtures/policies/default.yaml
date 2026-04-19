@@ -1,0 +1,20 @@
+# Baseline functional-test policy.
+#
+# Semantics:
+#   low    -> auto-grant (no user interaction)
+#   medium -> "ask" (PolicyEngine.evaluate returns decision="approval_required")
+#   high   -> "ask" (same)
+#
+# "ask" is encoded as approval because PolicyEngine recognises only
+# {auto, reason, approval}.  Any unrecognised threshold silently auto-grants
+# (see src/tool_governance/core/policy_engine.py fallback).  We keep the
+# default baseline deliberately "policy-open at low, ask at medium/high"
+# so the ask branch is exercised without relying on skill-specific overrides.
+default_risk_thresholds:
+  low: auto
+  medium: approval
+  high: approval
+default_ttl: 3600
+default_scope: session
+blocked_tools: []
+skill_policies: {}

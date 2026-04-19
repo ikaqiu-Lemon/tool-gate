@@ -351,6 +351,144 @@ Scaffolding  Core Logic   Plugin       Testing &
 
 ---
 
+## 6. Current Progress
+
+> Updated: 2026-04-17. Tracks hardening rounds after the initial Phase 1–3 review.
+
+### phase13-hardening-and-doc-sync — Stage A (D2, D1): **done**
+
+- **D2** `run_skill_action` now denies by default when `skills_metadata[skill_id]`
+  is `None` (returns `"metadata unavailable; operation denied"` and emits a
+  `skill.action.deny` audit event with `detail.reason="meta_missing"`). The
+  pre-fix branch that silently bypassed `allowed_ops` is gone.
+- **D1** `handle_post_tool_use` now stamps `last_used_at` on exactly one skill
+  per PostToolUse event. An explicit `matched` flag ensures the outer skill
+  loop exits after the first (top-level or stage-level) match — later skills
+  can no longer overwrite the timestamp.
+- **Tests**: `tests/test_integration.py` — added `TestRunSkillActionMetaMissing`
+  (2 cases) and `TestPostToolUseSingleStamp` (3 cases).
+- **Suite**: 104 → **109 passed** (`python -m pytest -q`). No regressions.
+- **Scope guard**: no changes to D3 / D6 / D7 / D4 / D5 / D8 in this stage;
+  no edits to `docs/requirements.md` or `docs/technical_design.md` in this
+  stage (reserved for later stages per plan).
+
+### phase13-hardening-and-doc-sync — Stage B (D6, D3, D7): **done**
+
+- **D6** `enable_skill_tool` (LangChain wrapper) now mirrors
+  `mcp_server.enable_skill` exactly. `scope` is coerced via
+  `"turn" if scope == "turn" else "session"` and `granted_by` via
+  `"auto" if decision.decision == "auto" else "policy"`. Both entry points
+  therefore build equivalent `Grant` objects (`scope`, `granted_by`,
+  `allowed_ops` all match) and write to `state.active_grants[skill_id]`
+  identically. An unrecognised `scope` no longer raises
+  `pydantic.ValidationError` from the LangChain path; it coerces to
+  `"session"` on both paths.
+- **D3** `refresh_skills` now performs exactly one directory scan per call.
+  A new `SkillIndexer.current_index()` read-only accessor returns the
+  freshly-built index to `mcp_server.refresh_skills` without a second
+  `build_index()` call. The response shape
+  (`{"refreshed": True, "skill_count": count}`) is unchanged.
+- **D7** New `grant.revoke` audit event, emitted **by
+  `GrantManager.revoke_grant()`** exactly once per revocation. Fields:
+  `session_id`, `skill_id`, `event_type="grant.revoke"`,
+  `detail={"grant_id": ..., "reason": ...}`. `reason` defaults to
+  `"explicit"`; callers may pass a different discriminator. `SQLiteStore`
+  gained no new API (an existing `get_grant(grant_id)` lookup was reused).
+  Event boundary with existing events:
+  - `grant.revoke` = grant status flipped `active → revoked` via
+    `revoke_grant()`. Currently reached only from the explicit
+    `disable_skill` paths (MCP + LangChain) with `reason="explicit"`.
+  - `skill.disable` = unchanged; emitted by the entry point *after*
+    `revoke_grant()` returns. An explicit disable therefore emits
+    `grant.revoke` → `skill.disable`, in that order.
+  - `grant.expire` = unchanged; emitted by the hook-handler TTL sweep.
+    `cleanup_expired` transitions status to `"expired"` (not `"revoked"`)
+    and does not go through `revoke_grant()`, so `grant.revoke` and
+    `grant.expire` never fire for the same grant.
+- **Tests**: `tests/test_grant_manager.py` — added 4 cases
+  (`grant.revoke` emission, custom-reason discriminator, unknown-id
+  no-op, `cleanup_expired` does not emit `grant.revoke`).
+  `tests/test_integration.py` — added `TestEnableSkillParity` (2 cases),
+  `TestRefreshSkillsSingleScan` (1 case), `TestDisableSkillAuditOrdering`
+  (2 cases: revoke-then-disable order, disable-without-grant emits
+  `skill.disable` only).
+- **Suite**: 109 → **118 passed**. No regressions.
+- **Scope guard**: `docs/requirements.md` not touched. `docs/technical_design.md`
+  has doc-sync notes only at this stage (no full rewrite); detailed
+  signature and state-model edits are deferred to Stage C per plan.
+
+### phase13-hardening-and-doc-sync — Stage C (D4, D5, D8): **done**
+
+- **D4** Coverage audit against the Stage A/B spec checklist passed;
+  `tests/test_integration.py` gained a `TestMetaNoneEdgeCases` class
+  (4 cases) that exercises the `meta is None` branch across MCP entry
+  points beyond `run_skill_action` — `change_stage`, `enable_skill`
+  (unknown skill), `read_skill` (unknown skill), and
+  `ToolRewriter.recompute_active_tools` (loaded skill without metadata
+  contributes zero tools). No code change.
+- **D5** `docs/technical_design.md` §3.2.4 (`PromptComposer`) and §3.2.5
+  (`ToolRewriter`) signature blocks rewritten to match the
+  implementation: `PromptComposer` takes no constructor arguments
+  (stateless formatter, reads from `SessionState`); `ToolRewriter` takes
+  `blocked_tools: list[str] | None = None` and `get_stage_tools` is a
+  `@staticmethod`. Chinese mirror `docs/技术方案文档.md` synced in the
+  same shape. No code change.
+- **D8** `state.active_grants` is keyed by **`skill_id`**. The
+  stale docstrings in `src/tool_governance/models/state.py` and
+  `src/tool_governance/core/state_manager.py` that described the dict as
+  `grant_id`-keyed were corrected to match the actual invariant.
+  `docs/technical_design.md` gained a state-model note stating the
+  invariants: at most one active `Grant` per `(session_id, skill_id)`;
+  the authoritative `grant_id` lives inside the stored `Grant` object;
+  re-keying is explicitly deferred. Chinese mirror synced.
+- **Suite**: 118 → **122 passed**. No regressions.
+- **Scope guard**: `docs/requirements.md` untouched — this round was
+  implementation/modelling semantics, not requirements. `docs/technical_design.md`
+  is now fully in sync with the implementation for the affected sections.
+
+### Drift Resolution Matrix — final for this round
+
+| ID  | status   | handling | evidence |
+|-----|----------|----------|----------|
+| D1  | closed   | fix      | `src/tool_governance/hook_handler.py::handle_post_tool_use`; `tests/test_integration.py::TestPostToolUseSingleStamp` |
+| D2  | closed   | fix      | `src/tool_governance/mcp_server.py::run_skill_action`; `tests/test_integration.py::TestRunSkillActionMetaMissing` |
+| D3  | closed   | fix      | `src/tool_governance/mcp_server.py::refresh_skills`, `src/tool_governance/core/skill_indexer.py::SkillIndexer.current_index`; `tests/test_integration.py::TestRefreshSkillsSingleScan` |
+| D4  | closed   | fix (tests) | `tests/test_integration.py::TestMetaNoneEdgeCases` (+ Stage A/B test classes) |
+| D5  | closed   | doc-sync | `docs/technical_design.md` §3.2.4, §3.2.5; `docs/技术方案文档.md` 3.2.4, 3.2.5 |
+| D6  | closed   | fix      | `src/tool_governance/tools/langchain_tools.py::enable_skill_tool`; `tests/test_integration.py::TestEnableSkillParity` |
+| D7  | closed   | fix      | `src/tool_governance/core/grant_manager.py::revoke_grant`; `tests/test_grant_manager.py::TestRevoke` (4 new), `tests/test_integration.py::TestDisableSkillAuditOrdering` |
+| D8  | closed   | doc-sync | `src/tool_governance/models/state.py::SessionState.active_grants`, `src/tool_governance/core/state_manager.py::remove_from_skills_loaded`; `docs/technical_design.md` §10-B "active_grants key-semantics note"; `docs/技术方案文档.md` "active_grants key 语义说明" |
+| D9  | deferred | backlog  | tracked in `openspec/changes/phase13-hardening-and-doc-sync/` proposal §"Out of Scope"; not implemented this round |
+| D10 | deferred | backlog  | same as D9 |
+
+### Close-out
+
+- **phase13-hardening-and-doc-sync closed on 2026-04-19**; D1–D4, D6, D7
+  fixed; D5, D8 doc-synced; D9, D10 deferred; Phase 4 not started.
+- Stage D (re-review prep + closeout) — **done** (`closeout.md`,
+  `review-inputs.md` landed; `openspec validate` passed; full suite
+  167/167 green at re-verify time, closeout baseline 122 at commit
+  `de787c7`).
+- Backlog only (not this round): D9, D10, Phase 4 items.
+
+### Functional test harness — `openspec/changes/add-functional-test-plan/`
+
+> Added 2026-04-18. Stages A–H landed; functional 45/45 green, full
+> suite 167/167. Policy fixtures (`tests/fixtures/policies/*.yaml`)
+> now drive a real `bootstrap.load_policy` → `PolicyEngine` path —
+> `test_functional_policy_fixtures.py`, `test_functional_policy_e2e.py`
+> and `test_functional_policy_e2e_lifecycle.py` prove low / medium /
+> high / `blocked_tools` / skill-specific override branches end-to-end
+> without patching the engine. Subprocess smoke lane
+> (`test_functional_smoke_subprocess.py`) exercises `tg-mcp` (8 meta-
+> tools), `mock_sensitive_stdio`, and three `tg-hook` event contracts.
+> **This is a test-harness enhancement, not a production feature
+> expansion** — no `src/tool_governance/` changes landed in this
+> round. See [`tests/functional/README.md`](../tests/functional/README.md)
+> for the full coverage tables.
+
+---
+
 - [Claude Code Plugin Reference](https://code.claude.com/docs/en/plugins-reference)
 - [Claude Code Hooks Reference](https://code.claude.com/docs/en/hooks)
 - [Claude Code Tools Reference](https://code.claude.com/docs/en/tools-reference)

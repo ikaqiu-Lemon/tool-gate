@@ -106,3 +106,5 @@ temp/
 # hooks/
 # .claude-plugin/
 # .mcp.json
+
+node_modules/

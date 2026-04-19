@@ -80,17 +80,35 @@ class GrantManager:
         )
         return grant
 
-    def revoke_grant(self, grant_id: str) -> None:
-        """Revoke a specific grant by setting its status to ``"revoked"``.
+    def revoke_grant(self, grant_id: str, reason: str = "explicit") -> None:
+        """Revoke a specific grant and emit a ``grant.revoke`` audit event.
+
+        The audit record is emitted once per revocation with
+        ``session_id`` and ``skill_id`` resolved from the stored row
+        and ``detail={"grant_id": ..., "reason": reason}``.  ``reason``
+        is a free-form discriminator — callers currently pass
+        ``"explicit"`` (from ``disable_skill`` paths).  Lifecycle
+        expiry takes a different path (``cleanup_expired`` transitions
+        status to ``"expired"`` and emits ``grant.expire``), so
+        ``grant.revoke`` and ``grant.expire`` never fire for the same
+        grant.
 
         Contract:
             Silences:
                 - If ``grant_id`` does not exist in the store, the
-                  outcome depends on ``update_grant_status``
-                  implementation — typically a silent no-op (zero rows
-                  updated).
+                  status update is a no-op and no audit event is
+                  emitted.  The caller has no return value to detect
+                  this.
         """
+        row = self._store.get_grant(grant_id)
         self._store.update_grant_status(grant_id, "revoked")
+        if row is not None:
+            self._store.append_audit(
+                row["session_id"],
+                "grant.revoke",
+                skill_id=row["skill_id"],
+                detail={"grant_id": grant_id, "reason": reason},
+            )
 
     def cleanup_expired(self, session_id: str) -> list[str]:
         """Mark expired grants and return their skill_ids.

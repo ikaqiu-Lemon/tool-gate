@@ -251,6 +251,15 @@ class SkillIndexer:
         self.build_index()
         return len(self._index)
 
+    def current_index(self) -> dict[str, SkillMetadata]:
+        """Return a snapshot of the current index without rescanning.
+
+        Callers that have just invoked :meth:`refresh` (or
+        :meth:`build_index`) can read the freshly-built index through
+        this accessor instead of triggering a second scan.
+        """
+        return dict(self._index)
+
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------

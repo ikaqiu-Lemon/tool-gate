@@ -5,19 +5,15 @@ for standardized tool definition. The actual MCP server (Phase 3)
 delegates to GovernanceRuntime directly; these are for internal
 composition and testing.
 
-.. note:: These wrappers differ from the MCP tools in
-   ``mcp_server.py`` in two ways: (1) ``scope`` is passed as-is
-   to ``create_grant`` without coercion to the ``Literal["turn",
-   "session"]`` type; (2) ``granted_by`` is set to
-   ``decision.decision`` directly (e.g. ``"auto"``), which happens
-   to be valid for the ``allowed=True`` path but would break Pydantic
-   validation if somehow reached with ``"reason_required"`` or
-   ``"approval_required"``.
+.. note:: ``enable_skill_tool`` mirrors ``mcp_server.enable_skill``
+   exactly for ``scope`` coercion and ``granted_by`` mapping so that
+   the two entry points build equivalent ``Grant`` objects and
+   ``state.active_grants`` rows for identical inputs.
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from langchain_core.tools import tool
 
@@ -54,6 +50,13 @@ def enable_skill_tool(
 ) -> dict[str, Any]:
     """Enable a skill for the current session.
 
+    Mirrors ``mcp_server.enable_skill``: ``scope`` is coerced to
+    ``"turn" | "session"`` (any other value falls back to
+    ``"session"``); ``granted_by`` is ``"auto"`` when the policy
+    decision is auto, otherwise ``"policy"``.  Both entry points
+    therefore build equivalent ``Grant`` objects and write
+    ``state.active_grants[skill_id]`` identically.
+
     Contract:
         Preconditions:
             - ``session_id`` must be a non-empty string for
@@ -61,16 +64,11 @@ def enable_skill_tool(
               accepted but produces a session keyed by ``""``,
               which may collide across calls.
 
-        Raises:
-            pydantic.ValidationError: If ``scope`` is not
-                ``"turn"`` or ``"session"`` — unlike
-                ``mcp_server.enable_skill``, no coercion is applied
-                here (from ``Grant`` constructor via
-                ``create_grant``, not caught).
-
         Silences:
             - Already-enabled skill returns success immediately
               without re-evaluating policy or extending TTL.
+            - An unrecognised ``scope`` string is coerced to
+              ``"session"`` rather than raising.
     """
     state = runtime.state_manager.load_or_init(session_id)
     meta = state.skills_metadata.get(skill_id)
@@ -85,16 +83,19 @@ def enable_skill_tool(
         return {"granted": False, "decision": decision.decision, "reason": decision.reason}
 
     capped_ttl = runtime.policy_engine.cap_ttl(skill_id, ttl)
-    # NB: granted_by receives decision.decision directly (e.g. "auto").
-    # This only works because this path is reached when allowed=True,
-    # which means decision.decision is always "auto" in practice.
+    # Mirror mcp_server.enable_skill for scope + granted_by so both
+    # entry points produce equivalent grants.
+    scope_val: Literal["turn", "session"] = "turn" if scope == "turn" else "session"
+    granted_by_val: Literal["auto", "user", "policy"] = (
+        "auto" if decision.decision == "auto" else "policy"
+    )
     grant = runtime.grant_manager.create_grant(
         session_id=session_id,
         skill_id=skill_id,
         allowed_ops=meta.allowed_ops,
-        scope=scope,
+        scope=scope_val,
         ttl=capped_ttl,
-        granted_by=decision.decision,
+        granted_by=granted_by_val,
         reason=reason or None,
     )
     runtime.state_manager.add_to_skills_loaded(state, skill_id, version=meta.version)
@@ -119,7 +120,7 @@ def disable_skill_tool(skill_id: str, runtime: Any, session_id: str = "") -> dic
 
     grant = state.active_grants.get(skill_id)
     if grant:
-        runtime.grant_manager.revoke_grant(grant.grant_id)
+        runtime.grant_manager.revoke_grant(grant.grant_id, reason="explicit")
 
     runtime.state_manager.remove_from_skills_loaded(state, skill_id)
     runtime.tool_rewriter.recompute_active_tools(state)

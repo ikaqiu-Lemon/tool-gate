@@ -371,15 +371,15 @@ class PolicyDecision(BaseModel):
 
 ```python
 class PromptComposer:
-    def __init__(self, indexer: SkillIndexer):
-        """Initialize"""
+    # No constructor arguments — PromptComposer is a stateless
+    # formatter.  All inputs arrive via SessionState on each call.
 
     def compose_context(self, state: SessionState) -> str:
-        """Generate complete additionalContext, including:
+        """Generate complete additionalContext (≤ 800 chars), composed of:
         1. Skill catalog summary (unenabled skills show only name and description)
         2. Currently enabled skills and their active_tools
-        3. Current stage info (if stages exist)
-        4. Authorization guidance prompt (for more capabilities, use read_skill -> enable_skill)
+        3. Authorization guidance (for more capabilities, use read_skill -> enable_skill)
+        Hard-truncates with "..." when the combined text exceeds the budget.
         """
 
     def compose_skill_catalog(self, state: SessionState) -> str:
@@ -393,7 +393,7 @@ class PromptComposer:
 - Output kept under 800 characters (skill catalog summary + active tools hint + guidance text)
 - Enabled skills show more details (current stage, allowed_tools list)
 - Unenabled skills show only name, description, and risk level
-- Uses cached skills_metadata on each UserPromptSubmit call to avoid redundant construction
+- Stateless class: no `SkillIndexer` dependency is injected at construction time. The skill catalog is read from `state.skills_metadata` which the hook handler populates via the indexer before calling `compose_context`.
 
 #### 3.2.5 tool_rewriter.py
 
@@ -403,16 +403,20 @@ class PromptComposer:
 
 ```python
 class ToolRewriter:
-    def __init__(self, indexer: SkillIndexer):
-        """Initialize"""
+    def __init__(self, blocked_tools: list[str] | None = None):
+        """Initialize with an optional global deny-list of tool names
+        (applied last, after meta + stage tools are unioned)."""
 
     def recompute_active_tools(self, state: SessionState) -> list[str]:
         """Iterate skills_loaded, take the union of allowed_tools by current_stage, filter blocklist.
         If a skill has no stage definitions, use the entire skill's allowed_tools.
-        If a skill has stage definitions but current_stage is None, use the first stage's allowed_tools."""
+        If a skill has stage definitions but current_stage is None, use the first stage's allowed_tools.
+        Mutates ``state.active_tools`` in place; returns the new list."""
 
-    def get_stage_tools(self, skill_meta: SkillMetadata, current_stage: str | None) -> list[str]:
-        """Get allowed_tools for a specified skill at a specified stage"""
+    @staticmethod
+    def get_stage_tools(skill_meta: SkillMetadata, current_stage: str | None) -> list[str]:
+        """Get allowed_tools for a specified skill at a specified stage
+        (stateless — no ToolRewriter instance needed)."""
 ```
 
 **Implementation notes**:
@@ -421,6 +425,7 @@ class ToolRewriter:
 - **Recalculated from current state each turn, no incremental append** (corresponding to Skill-Hub design principle)
 - If a skill has stages definitions, use `LoadedSkillInfo.current_stage` to get the corresponding stage's allowed_tools
 - Update `state.active_tools` after each recalculation
+- `ToolRewriter` takes an optional `blocked_tools` list instead of a `SkillIndexer` handle; skill metadata is read from `state.skills_metadata`, so the indexer is not needed at construction time.
 
 #### 3.2.6 grant_manager.py
 
@@ -1026,6 +1031,97 @@ The following items have uncertainties at the current design stage and need to b
 | U6 | MCP Server process lifecycle management | .mcp.json | Claude Code should manage automatically; needs verification |
 | U7 | Specific plugin installation command and process | README.md | Reference actual version's CLI documentation |
 | U8 | PreToolUse hook matcher format for MCP tools | hooks.json | MCP tool name format is `mcp__<server>__<tool>`; verify whether matcher supports wildcards |
+
+---
+
+## 10-B Phase 1–3 Hardening Sync Notes (phase13-hardening-and-doc-sync)
+
+> Sync-only entries from the Stage A / B hardening round. Body text in
+> earlier sections is unchanged; edits required there are tracked in
+> Stage C. These notes are the canonical record of behavioural deltas
+> that already landed in code.
+
+### Stage A — run_skill_action deny-by-default (D2)
+
+- `run_skill_action` denies when `state.skills_metadata[skill_id]` is
+  `None`. Response: `{"error": "Skill '…' metadata unavailable; operation denied"}`.
+- Audit: one `skill.action.deny` record per denied call, with
+  `detail={"op": <op>, "reason": "meta_missing"}`. No dispatch, no
+  grant/state mutation.
+
+### Stage A — PostToolUse single-stamp (D1)
+
+- `handle_post_tool_use` stamps `last_used_at` on exactly one skill per
+  event. Top-level `allowed_tools` match beats stage-level match; the
+  first matching skill in iteration order wins. Later skills cannot
+  overwrite the timestamp.
+
+### Stage B — enable_skill entry-point parity (D6)
+
+- `enable_skill_tool` (LangChain) and `mcp_server.enable_skill` apply
+  the same coercions: `scope = "turn" if scope == "turn" else "session"`;
+  `granted_by = "auto" if decision.decision == "auto" else "policy"`.
+- Invariant: for identical inputs both entry points build equivalent
+  `Grant` objects and write `state.active_grants[skill_id]` identically.
+- An unrecognised `scope` no longer raises from the LangChain path; it
+  coerces to `"session"` on both paths.
+
+### Stage B — refresh_skills single scan (D3)
+
+- `refresh_skills` performs exactly one directory scan per call.
+  `SkillIndexer.current_index()` is the read-only accessor used after
+  `refresh()` to read the freshly-built index without a second
+  `build_index()` invocation.
+- Response shape unchanged: `{"refreshed": True, "skill_count": count}`.
+
+### Stage B — grant.revoke audit event (D7)
+
+- New event `grant.revoke`, emitted by `GrantManager.revoke_grant()`
+  exactly once per revocation. Fields: `session_id`, `skill_id`,
+  `event_type="grant.revoke"`, `detail={"grant_id": ..., "reason": ...}`.
+- `revoke_grant(grant_id, reason="explicit")` — `reason` defaults to
+  `"explicit"`; callers MAY pass other discriminators for future
+  revoke-paths (e.g. turn/session scope revocation).
+- Event-boundary invariants:
+  - `skill.disable` (unchanged) — still emitted by the entry point
+    after `revoke_grant()` returns. Explicit-disable ordering is
+    `grant.revoke` → `skill.disable`.
+  - `grant.expire` (unchanged) — still emitted by the hook-handler TTL
+    sweep. `cleanup_expired` transitions status to `"expired"` directly
+    and does **not** go through `revoke_grant()`; `grant.revoke` and
+    `grant.expire` therefore never fire for the same grant.
+  - Disabling a skill whose grant was already cleaned up emits
+    `skill.disable` only (no `grant.revoke`).
+
+### Stage C — active_grants key-semantics note (D8)
+
+`state.active_grants: dict[str, Grant]` is keyed by **`skill_id`**, not
+by `grant_id`. The authoritative `grant_id` lives inside each stored
+`Grant` object (and on the DB row); the dict key is the lookup handle
+used by `enable_skill` / `disable_skill` / `run_skill_action`.
+
+Invariants held by the current implementation:
+
+- At most one active `Grant` per `(session_id, skill_id)` pair.
+  Re-enabling a skill overwrites the previous entry.
+- `remove_from_skills_loaded(state, skill_id)` detaches both
+  `skills_loaded[skill_id]` and `active_grants[skill_id]` atomically.
+- Lifecycle events (`grant.revoke`, `grant.expire`) carry the
+  authoritative `grant_id` in their audit record, so the key collision
+  with `skill_id` does not affect audit correlation.
+
+**Deferred**: re-keying `active_grants` to `grant_id` would allow
+multiple simultaneous grants per skill (e.g. overlapping scopes) but
+is not a current requirement and is explicitly out of scope for this
+hardening round. Stale docstrings in `models/state.py` and
+`core/state_manager.py` that described the dict as `grant_id`-keyed
+have been corrected in code as part of this doc-sync.
+
+### Stage C — D5 signatures, D8 note: resolved
+
+The previous "Deferred to Stage C" bullet is now closed: Section 3.2.4
+(`PromptComposer`) and Section 3.2.5 (`ToolRewriter`) signatures match
+the implementation, and D8 is documented above.
 
 ---
 

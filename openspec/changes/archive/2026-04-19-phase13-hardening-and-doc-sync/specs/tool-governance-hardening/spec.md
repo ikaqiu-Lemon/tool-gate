@@ -89,6 +89,17 @@ a `reason` discriminator (e.g. `explicit`, `ttl`, `turn`, `session`).
 - **THEN** a `grant.revoke` audit event is emitted with the corresponding
   `reason` discriminator.
 
+> **Superseded by Stage B pivot (2026-04-17)**: the final implementation
+> keeps TTL/turn/session expiry on the pre-existing `grant.expire` event
+> (emitted by `hook_handler` after `GrantManager.cleanup_expired` marks
+> the row `"expired"`), and reserves `grant.revoke` for explicit
+> revocation paths only. Event boundary is documented in
+> `docs/technical_design.md` §"Stage B — grant.revoke audit event (D7)"
+> and pinned by
+> `tests/test_grant_manager.py::TestRevoke::test_cleanup_expired_does_not_emit_grant_revoke`.
+> `revoke_grant`'s `reason` parameter remains available for any future
+> non-explicit revoke path; this scenario is retained for history.
+
 ### Requirement: Test coverage MUST exist for hardening branches (D4)
 
 The test suite SHALL include cases that exercise the new branches introduced

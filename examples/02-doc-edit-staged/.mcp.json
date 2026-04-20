@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "tool-governance": {
+      "command": "tg-mcp"
+    },
+    "mock-yuque": {
+      "command": "python",
+      "args": ["./mcp/mock_yuque_stdio.py"]
+    },
+    "mock-shell": {
+      "command": "python",
+      "args": ["./mcp/mock_shell_stdio.py"]
+    }
+  }
+}

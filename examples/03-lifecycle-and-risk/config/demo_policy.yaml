@@ -1,0 +1,20 @@
+# Demo policy for example 03 — lifecycle-and-risk
+# Short TTL on yuque-knowledge-link to demo expiry; approval on yuque-bulk-delete;
+# global block on yuque_delete_doc as the second line of defense.
+
+default_risk_thresholds:
+  low: auto
+  medium: reason
+  high: approval
+
+default_ttl: 3600
+default_scope: session
+
+skill_policies:
+  yuque-knowledge-link:
+    max_ttl: 120            # force short TTL for expiry demo
+  yuque-bulk-delete:
+    approval_required: true
+
+blocked_tools:
+  - yuque_delete_doc

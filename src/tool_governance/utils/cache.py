@@ -1,4 +1,17 @@
-"""LRU/TTL cache wrapper with version-aware keys."""
+"""LRU/TTL cache wrapper with version-aware keys.
+
+Used by :class:`tool_governance.core.skill_indexer.SkillIndexer` in two
+roles:
+
+- **Document cache** — caches parsed ``SkillContent`` objects produced
+  by ``read_skill``; keyed by ``skill_id::version``; TTL-bounded.
+- **Metadata cache** — caches ``SkillMetadata`` objects produced by the
+  directory scan; keyed by the same ``skill_id::version`` shape.
+
+Both roles share the same class and therefore the same key / TTL /
+invalidation / hit-miss-counter contract; only the cached value type
+differs.
+"""
 
 from __future__ import annotations
 

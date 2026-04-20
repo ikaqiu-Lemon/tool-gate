@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "examples/02-doc-edit-staged/schemas/run_command.schema.json",
+  "title": "run_command contract (confounder tool; perpetually blocked by blocked_tools)",
+  "description": "Mixed-environment noise tool. Never passes PreToolUse in this example. Does NOT indicate that the project supports arbitrary shell execution.",
+  "type": "object",
+  "required": ["input", "output"],
+  "properties": {
+    "input": {
+      "type": "object",
+      "required": ["cmd"],
+      "additionalProperties": false,
+      "properties": {
+        "cmd": {"type": "string", "minLength": 1},
+        "cwd": {"type": "string"}
+      }
+    },
+    "output": {
+      "type": "object",
+      "required": ["stdout", "stderr", "exit_code"],
+      "additionalProperties": false,
+      "properties": {
+        "stdout":    {"type": "string"},
+        "stderr":    {"type": "string"},
+        "exit_code": {"type": "integer"}
+      }
+    }
+  }
+}

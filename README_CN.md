@@ -274,6 +274,7 @@ claude plugin validate /path/to/tool-gate
 - `README.md`：英文概览
 - `README_CN.md`：中文概览
 - `docs/`：需求、技术方案、开发计划等长文档
+- [`examples/`](./examples/)：交付展示样例(3 个独立 demo workspace,覆盖主流程与所有核心功能)
 
 ---
 

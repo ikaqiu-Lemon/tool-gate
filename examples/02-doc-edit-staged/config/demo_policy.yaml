@@ -1,0 +1,17 @@
+# Demo policy for example 02 — doc-edit-staged
+# Enforces require_reason on yuque-doc-edit and globally blocks run_command.
+
+default_risk_thresholds:
+  low: auto
+  medium: reason
+  high: approval
+
+default_ttl: 3600
+default_scope: session
+
+skill_policies:
+  yuque-doc-edit:
+    require_reason: true
+
+blocked_tools:
+  - run_command

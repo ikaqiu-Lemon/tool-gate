@@ -1,0 +1,14 @@
+# Demo policy for example 01 — knowledge link
+# Default thresholds match root config/default_policy.yaml so low-risk skills auto-grant.
+
+default_risk_thresholds:
+  low: auto
+  medium: reason
+  high: approval
+
+default_ttl: 3600
+default_scope: session
+
+skill_policies: {}
+
+blocked_tools: []

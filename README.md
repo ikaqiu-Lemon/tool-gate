@@ -279,6 +279,7 @@ claude plugin validate /path/to/tool-gate
 - `README.md` — English overview
 - `README_CN.md` — Chinese overview
 - `docs/` — design notes, requirements, and development plan
+- [`examples/`](./examples/) — delivery demo workspaces (three self-contained scenarios covering the full governance pipeline)
 
 ---
 

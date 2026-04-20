@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "examples/02-doc-edit-staged/schemas/yuque_update_doc.schema.json",
+  "title": "yuque_update_doc contract (execution stage only)",
+  "type": "object",
+  "required": ["input", "output"],
+  "properties": {
+    "input": {
+      "type": "object",
+      "required": ["doc_id", "body_markdown"],
+      "additionalProperties": false,
+      "properties": {
+        "doc_id":        {"type": "string", "minLength": 1},
+        "body_markdown": {"type": "string"},
+        "base_version":  {"type": "integer", "minimum": 1}
+      }
+    },
+    "output": {
+      "type": "object",
+      "required": ["ok", "version"],
+      "additionalProperties": false,
+      "properties": {
+        "ok":      {"type": "boolean"},
+        "version": {"type": "integer", "minimum": 1}
+      }
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "examples/01-knowledge-link/schemas/yuque_list_comments.schema.json",
+  "title": "yuque_list_comments contract (unlocked by refresh_skills episode)",
+  "description": "Reserved for refresh-episode skill yuque-comment-sync; not called by main flow.",
+  "type": "object",
+  "required": ["input", "output"],
+  "properties": {
+    "input": {
+      "type": "object",
+      "required": ["doc_id"],
+      "additionalProperties": false,
+      "properties": {
+        "doc_id": {"type": "string", "minLength": 1}
+      }
+    },
+    "output": {
+      "type": "object",
+      "required": ["comments"],
+      "additionalProperties": false,
+      "properties": {
+        "comments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "author", "body", "created_at"],
+            "additionalProperties": false,
+            "properties": {
+              "id":         {"type": "string"},
+              "author":     {"type": "string"},
+              "body":       {"type": "string"},
+              "created_at": {"type": "string", "format": "date-time"}
+            }
+          }
+        }
+      }
+    }
+  }
+}

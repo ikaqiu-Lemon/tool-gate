@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "examples/03-lifecycle-and-risk/schemas/yuque_get_doc.schema.json",
+  "title": "yuque_get_doc contract",
+  "type": "object",
+  "required": ["input", "output"],
+  "properties": {
+    "input": {
+      "type": "object",
+      "required": ["doc_id"],
+      "additionalProperties": false,
+      "properties": {
+        "doc_id": {"type": "string", "minLength": 1}
+      }
+    },
+    "output": {
+      "type": "object",
+      "required": ["id", "title", "body_markdown", "updated_at"],
+      "additionalProperties": false,
+      "properties": {
+        "id":            {"type": "string"},
+        "title":         {"type": "string"},
+        "body_markdown": {"type": "string"},
+        "updated_at":    {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

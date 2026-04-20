@@ -326,3 +326,168 @@ class TestVersionedTTLCache:
         cache.put("k2", "v2")
         cache.clear()
         assert cache.currsize == 0
+
+
+# ---------------------------------------------------------------------------
+# Stage B: metadata_cache shadow-write wiring
+# ---------------------------------------------------------------------------
+
+class TestMetadataCacheShadow:
+    """Stage B · formalize-cache-layers: metadata_cache is shadow-written
+    by build_index; reads still go through _index.  These tests confirm
+    the shadow wiring without asserting any read-path behaviour change."""
+
+    def test_metadata_cache_size_matches_index(self, indexer: SkillIndexer) -> None:
+        """After build_index, metadata_cache holds exactly one entry per
+        indexed skill (shadow-parity invariant)."""
+        indexer.build_index()
+        assert indexer.metadata_cache.currsize == len(indexer.list_skills())
+
+    def test_custom_metadata_cache_receives_writes(self, skills_dir: Path) -> None:
+        """An injected custom metadata_cache instance receives the same
+        puts — proves the wiring is not hard-coded to an internal default."""
+        custom = VersionedTTLCache()
+        indexer = SkillIndexer(skills_dir, metadata_cache=custom)
+        assert custom.currsize == 0
+        indexer.build_index()
+        assert custom.currsize == 2  # repo-read + code-edit from fixture
+
+    def test_legacy_cache_param_emits_deprecation_warning(self, skills_dir: Path) -> None:
+        """Passing the legacy positional/keyword `cache=` parameter emits
+        DeprecationWarning while preserving backward-compatible behaviour
+        (doc cache still works)."""
+        with pytest.warns(DeprecationWarning, match="deprecated"):
+            indexer = SkillIndexer(skills_dir, cache=VersionedTTLCache())
+        indexer.build_index()
+        assert indexer.read_skill("repo-read") is not None
+
+    def test_cache_and_doc_cache_conflict_raises(self, skills_dir: Path) -> None:
+        """Supplying both legacy `cache=` and new `doc_cache=` is an error
+        — they are aliases and must not be combined."""
+        with pytest.raises(TypeError, match="aliases"):
+            SkillIndexer(
+                skills_dir,
+                cache=VersionedTTLCache(),
+                doc_cache=VersionedTTLCache(),
+            )
+
+
+# ---------------------------------------------------------------------------
+# Stage C: read-path migration + spec requirement coverage
+# ---------------------------------------------------------------------------
+
+class TestStageC_CacheLayerFormalization:
+    """Stage C · formalize-cache-layers: metadata reads flow through the
+    formal cache layer with safe rebuild-from-disk fallback.  Each test
+    maps to one spec scenario in
+    ``openspec/changes/formalize-cache-layers/specs/skill-discovery/spec.md``.
+    """
+
+    def test_cache_miss_triggers_clean_rebuild(self, indexer: SkillIndexer) -> None:
+        """Spec · Safe fallback · Cache miss triggers a clean rebuild:
+        a missing metadata entry is re-parsed from disk and repopulates
+        the cache."""
+        indexer.build_index()
+        assert indexer.metadata_cache.currsize > 0
+        indexer.metadata_cache.clear()
+        assert indexer.metadata_cache.currsize == 0
+        skills = indexer.list_skills()
+        assert len(skills) == 2  # repo-read + code-edit from fixture
+        assert indexer.metadata_cache.currsize > 0  # rebuilt populated
+
+    def test_metadata_version_bump_supersedes_cache(self, skills_dir: Path) -> None:
+        """Spec · Version change · Version bump supersedes a cached metadata
+        entry: incrementing a skill's version on disk and refreshing serves
+        the new version instead of the previously-cached one."""
+        indexer = SkillIndexer(skills_dir)
+        indexer.build_index()
+
+        repo_md = skills_dir / "repo-read" / "SKILL.md"
+        original = repo_md.read_text(encoding="utf-8")
+        bumped = original.replace('version: "1.0.0"', 'version: "2.0.0"')
+        repo_md.write_text(bumped, encoding="utf-8")
+
+        indexer.refresh()
+        meta = next(s for s in indexer.list_skills() if s.skill_id == "repo-read")
+        assert meta.version == "2.0.0"
+
+    def test_doc_version_bump_supersedes_cached_doc(self, skills_dir: Path) -> None:
+        """Spec · Version change · Version bump supersedes a cached document:
+        when both the frontmatter version and the body change on disk,
+        refresh + re-read returns content derived from the new version."""
+        indexer = SkillIndexer(skills_dir)
+        indexer.build_index()
+        first = indexer.read_skill("repo-read")
+        assert first is not None
+        assert "Read-only exploration" in first.sop
+
+        repo_md = skills_dir / "repo-read" / "SKILL.md"
+        original = repo_md.read_text(encoding="utf-8")
+        bumped = original.replace('version: "1.0.0"', 'version: "2.0.0"')
+        bumped = bumped.replace("Read-only exploration.", "Post-v2 body.")
+        repo_md.write_text(bumped, encoding="utf-8")
+
+        indexer.refresh()
+        second = indexer.read_skill("repo-read")
+        assert second is not None
+        assert second.metadata.version == "2.0.0"
+        assert "Post-v2 body." in second.sop
+
+    def test_cached_and_rebuilt_metadata_are_identical(
+        self, indexer: SkillIndexer
+    ) -> None:
+        """Spec · Cache-as-performance-layer · Cached and rebuilt values
+        are interchangeable: clearing the metadata cache and re-listing
+        returns identical content."""
+        indexer.build_index()
+        before = sorted(
+            (m.model_dump() for m in indexer.list_skills()),
+            key=lambda d: d["skill_id"],
+        )
+
+        indexer.metadata_cache.clear()
+        after = sorted(
+            (m.model_dump() for m in indexer.list_skills()),
+            key=lambda d: d["skill_id"],
+        )
+        assert before == after
+
+    def test_refresh_clears_both_cache_layers(self, indexer: SkillIndexer) -> None:
+        """Spec · Two-layer caching + Refresh · metadata and document
+        entries honor a common invalidation surface; one ``refresh()``
+        call empties both cache layers within the same operation."""
+        indexer.build_index()
+        indexer.read_skill("repo-read")  # prime doc cache
+        assert indexer.metadata_cache.currsize > 0
+        assert indexer.doc_cache.currsize > 0
+
+        indexer.refresh()
+        # metadata_cache is repopulated as part of rebuild; doc_cache is
+        # left empty until the next read_skill re-populates it.
+        assert indexer.doc_cache.currsize == 0
+
+    def test_refresh_failure_drops_stale_entries(self, tmp_path: Path) -> None:
+        """Spec · Safe fallback · Refresh failure degrades safely: when a
+        skill's source file becomes invalid after an initial successful
+        scan, refresh + list_skills must not present the pre-refresh
+        cached entry as fresh."""
+        skills = tmp_path / "skills"
+        skills.mkdir()
+        good = skills / "good"
+        good.mkdir()
+        (good / "SKILL.md").write_text(
+            '---\nname: Good\ndescription: "ok"\nversion: "1.0.0"\n---\n\nbody',
+            encoding="utf-8",
+        )
+        indexer = SkillIndexer(skills)
+        indexer.build_index()
+        assert any(s.skill_id == "good" for s in indexer.list_skills())
+
+        # Corrupt the skill file after initial successful scan.
+        (good / "SKILL.md").write_text(
+            "---\n: [invalid yaml\n---\nbody", encoding="utf-8"
+        )
+
+        indexer.refresh()
+        ids_after = {s.skill_id for s in indexer.list_skills()}
+        assert "good" not in ids_after  # dropped, not served from pre-refresh cache

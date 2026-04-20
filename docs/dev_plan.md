@@ -497,3 +497,55 @@ Scaffolding  Core Logic   Plugin       Testing &
 - [anthropics/claude-code Official Plugin Repository](https://github.com/anthropics/claude-code/tree/main/plugins)
 - [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk)
 - Skill-Hub Project Documentation (this project's `Skill-Hub Project Prep Edition.md`, `Handwritten Skills Long Edition.md`)
+
+---
+
+## Addendum — Delivery Demo Workspaces (`examples/`)
+
+**Source change**: `openspec/changes/add-delivery-demo-workspaces/`
+**Phase A completion**: 2026-04-19
+
+Phase A produced three self-contained demo workspaces under `examples/`
+covering the full governance pipeline without pytest:
+
+- `01-knowledge-link/` — first-time discovery + low-risk auto-grant + confounder interception + `refresh_skills` episode
+- `02-doc-edit-staged/` — `require_reason` + staged `change_stage` + global `blocked_tools` red line
+- `03-lifecycle-and-risk/` — TTL expiry + explicit `disable_skill` + high-risk `approval_required` + audit closure
+
+Phase A deliverables: 3 workspace READMEs, 6 skeleton SKILL.md files, 3
+`demo_policy.yaml`, 3 `.mcp.json` (relative paths), 4 contract markdown
+files, and 16 JSON Schema files (Draft 2020-12, each with `input` +
+`output` subschemas). No Python, no core-code change.
+
+Phase B (future change) will implement `mock_*_stdio.py` servers per the
+contract tables and schema files, then backfill measured stdout /
+`governance.db` audit rows into each workspace README §5.
+
+### Phase B completion (2026-04-19)
+
+Phase B shipped four types of mock MCP stdio servers under each workspace's
+`mcp/` directory (six Python files total):
+
+- `mock_yuque_stdio.py` — three per-workspace variants tailored to each demo's
+  hardcoded sample scope (example 01 covers `yuque_list_comments` for the
+  refresh episode; example 02 adds a `version` field for write-back conflict
+  demo; example 03 adds `yuque_delete_doc` for the two-layer defense demo).
+- `mock_web_search_stdio.py` / `mock_internal_doc_stdio.py` — confounder MCPs
+  in example 01.
+- `mock_shell_stdio.py` — confounder MCP in example 02; module docstring
+  carries the verbatim "混杂变量工具 / 不代表本项目支持任意 shell 执行"
+  disclaimer.
+
+Each mock runs `jsonschema.validate` on every hardcoded output sample against
+its paired `schemas/<tool>.schema.json` at module import time; mismatch exits
+non-zero before `mcp.run()`. A `tools/list` handshake smoke across all six
+Python files was green (5 + 1 + 1 + 3 + 1 + 5 = 16 tool registrations match
+contract tables).
+
+Remaining Phase B items left intentionally open:
+- **10.9 Live Claude CLI capture** — each workspace can start and answer MCP
+  `tools/list`; live end-to-end interactive stdout capture is a per-delivery
+  rehearsal, not a one-time task.
+- **10.10 SKILL.md SOP bodies** — skeletons with `<!-- Phase B 前补齐 -->`
+  retained; SOP depth is deferred to the next iteration since the runnability
+  contract does not depend on SOP text.

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "examples/01-knowledge-link/schemas/search_doc.schema.json",
+  "title": "search_doc contract (confounder tool; never passes PreToolUse in this example)",
+  "type": "object",
+  "required": ["input", "output"],
+  "properties": {
+    "input": {
+      "type": "object",
+      "required": ["keyword", "space"],
+      "additionalProperties": false,
+      "properties": {
+        "keyword": {"type": "string", "minLength": 1},
+        "space":   {"type": "string", "minLength": 1}
+      }
+    },
+    "output": {
+      "type": "object",
+      "required": ["hits"],
+      "additionalProperties": false,
+      "properties": {
+        "hits": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "title", "snippet"],
+            "additionalProperties": false,
+            "properties": {
+              "path":    {"type": "string"},
+              "title":   {"type": "string"},
+              "snippet": {"type": "string"}
+            }
+          }
+        }
+      }
+    }
+  }
+}

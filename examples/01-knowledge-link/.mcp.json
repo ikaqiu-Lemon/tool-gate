@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "tool-governance": {
+      "command": "tg-mcp"
+    },
+    "mock-yuque": {
+      "command": "python",
+      "args": ["./mcp/mock_yuque_stdio.py"]
+    },
+    "mock-web-search": {
+      "command": "python",
+      "args": ["./mcp/mock_web_search_stdio.py"]
+    },
+    "mock-internal-doc": {
+      "command": "python",
+      "args": ["./mcp/mock_internal_doc_stdio.py"]
+    }
+  }
+}

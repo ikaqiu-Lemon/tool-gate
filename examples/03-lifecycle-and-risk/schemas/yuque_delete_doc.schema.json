@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "examples/03-lifecycle-and-risk/schemas/yuque_delete_doc.schema.json",
+  "title": "yuque_delete_doc contract (high-risk tool; perpetually blocked by blocked_tools)",
+  "description": "Used to demonstrate the two-layer defense (approval_required + blocked_tools). The model should never receive a real response from this tool in this example.",
+  "type": "object",
+  "required": ["input", "output"],
+  "properties": {
+    "input": {
+      "type": "object",
+      "required": ["doc_id", "confirm"],
+      "additionalProperties": false,
+      "properties": {
+        "doc_id":  {"type": "string", "minLength": 1},
+        "confirm": {"type": "boolean"}
+      }
+    },
+    "output": {
+      "type": "object",
+      "required": ["ok", "deleted_id"],
+      "additionalProperties": false,
+      "properties": {
+        "ok":         {"type": "boolean"},
+        "deleted_id": {"type": "string"}
+      }
+    }
+  }
+}

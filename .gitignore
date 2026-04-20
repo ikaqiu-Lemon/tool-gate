@@ -5,6 +5,10 @@
 Thumbs.db
 desktop.ini
 
+
+docs/refer/
+
+
 .idea/
 .vscode/
 *.code-workspace

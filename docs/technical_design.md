@@ -515,19 +515,54 @@ CREATE INDEX idx_audit_event ON audit_log(event_type);
 
 ### 3.4 Cache Module (`src/tool_governance/utils/cache.py`)
 
-**Two-layer caching strategy** (corresponding to Skill-Hub project practice):
+> **Change reference**: `openspec/changes/formalize-cache-layers/` ·
+> closeout 2026-04-20.
 
-| Cache Layer | Storage Location | Content | Invalidation Strategy |
-|-------------|-----------------|---------|----------------------|
-| Metadata cache | SessionState.skills_metadata | Skill index (name, description, allowed_tools, etc.) | Session-level: rebuilt on new session, explicit refresh |
-| Document cache | In-process TTLCache | read_skill parse results (SOP body) | TTL (default 300s) + LRU (default maxsize=100) |
+**Unified `VersionedTTLCache` contract with two usage roles** (corresponding
+to Skill-Hub project practice). Metadata and document caching share a
+single class; only the stored value type differs.
+
+| Role | Value type | Owned by | Populated by | Invalidated by |
+|---|---|---|---|---|
+| Metadata cache | `SkillMetadata` | `SkillIndexer._metadata_cache` | `build_index` / rebuild-on-miss via `_get_metadata` | `refresh()` / TTL / LRU / explicit `invalidate(key)` |
+| Document cache | `SkillContent` | `SkillIndexer._doc_cache` | `read_skill` on first access (cache-first, miss → disk parse) | `refresh()` / TTL / LRU / explicit `invalidate(key)` |
+
+**Shared four-dimensional contract** (both roles satisfy the same
+guarantees — differ only in value type):
+
+- **Key**: `VersionedTTLCache.make_key(skill_id, version=...)` →
+  `"{skill_id}::{version}"`; version flows from SKILL.md frontmatter.
+- **TTL / maxsize**: constructor parameters; per-instance (defaults:
+  `maxsize=100`, `ttl=300`).
+- **Invalidate**: `invalidate(key)` per-entry, `clear()` whole-pool,
+  automatic TTL expiry, LRU eviction on overflow.
+- **Observability**: `hits` / `misses` counters on every instance.
+
+**Cache-is-a-performance-layer invariant**: neither role is the source
+of truth for skill data. The authoritative registry is
+`SkillIndexer._indexed_skills: dict[skill_id, (version, source_path)]`
+— a lightweight catalog of "what the last scan discovered". The
+metadata cache is a performance layer on top of the registry; any
+cache miss triggers a disk re-parse via `_parse_skill_file` and
+repopulates the cache without changing observable behaviour.
+`refresh()` clears both cache layers within the same call; a refresh
+failure prunes the registry entry rather than presenting a pre-refresh
+cached value as fresh.
 
 ```python
-from cachetools import TTLCache
+from tool_governance.utils.cache import VersionedTTLCache
 
-# Document cache: TTL 5 minutes, max 100 cached skill documents
-skill_doc_cache = TTLCache(maxsize=100, ttl=300)
+metadata_cache = VersionedTTLCache(maxsize=100, ttl=300)  # SkillMetadata
+doc_cache      = VersionedTTLCache(maxsize=100, ttl=300)  # SkillContent
 ```
+
+**Process lifecycle and cache validity**: both caches are process-local
+and die with the hook-handler / MCP-server subprocess. Cold-start hit
+rate is therefore 0% by definition; the requirements doc §6.1 in-session
+hit-rate target (>95%) applies to warm-state behaviour within a single
+process. Persistent caching across processes is explicitly out of scope
+for this change — `SessionState.skills_metadata` remains the session-
+level snapshot serialised through SQLite, untouched.
 
 ---
 

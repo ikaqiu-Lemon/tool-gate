@@ -108,7 +108,7 @@ def create_governance_runtime(
     tracer = create_tracer()
     store = SQLiteStore(data_dir, tracer=tracer)
     cache = VersionedTTLCache(maxsize=100, ttl=300)
-    indexer = SkillIndexer(skills_dir, cache)
+    indexer = SkillIndexer(skills_dir, doc_cache=cache)
     state_manager = StateManager(store)
     # Fall back to data_dir for config if no explicit config_dir given.
     policy = load_policy(config_dir or data_dir)

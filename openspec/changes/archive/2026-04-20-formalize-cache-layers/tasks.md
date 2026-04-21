@@ -100,20 +100,20 @@
 - 测试按 spec 场景一一对应,每条 ≤ 15 行;重用 Stage B 已有 fixture
 - 每条新测试的 `#### Scenario` 名称直接映射到 spec 文件行,方便 reviewer 对照,不需要我再写额外说明
 
-- [ ] 3.1 `list_skills()` 改为从 `metadata_cache` 读当前非过期条目
-- [ ] 3.2 `current_index()` 改为从 `metadata_cache` 聚合返回(返回形状 `dict[str, SkillMetadata]` 不变)
-- [ ] 3.3 `refresh()` 改为 `metadata_cache.clear()` + `doc_cache.clear()` + `build_index()`,删除 `self._index = {}`
-- [ ] 3.4 `build_index()` 内部移除对 `self._index` 的写入,仅写 `metadata_cache`
-- [ ] 3.5 从 `SkillIndexer` 类彻底删除 `self._index` 属性定义
-- [ ] 3.6 测试 · cache miss 路径:条目缺失时自动磁盘重建并回填(spec "Cache miss triggers a clean rebuild")
-- [ ] 3.7 测试 · metadata version bump:frontmatter version 递增后旧条目不再命中(spec "Version bump supersedes a cached metadata entry")
-- [ ] 3.8 测试 · doc version bump:SKILL.md 正文变化 + version 递增后旧 doc 条目不再命中(spec "Version bump supersedes a cached document")
-- [ ] 3.9 测试 · 整池 clear 后 list / read 结果与带缓存路径 content-identical(spec "Cached and rebuilt values are interchangeable")
-- [ ] 3.10 测试 · refresh 后 `metadata_cache.currsize == 0` 且 `doc_cache.currsize == 0`(spec "Refresh skills index" / "Metadata and document entries honor a common invalidation surface")
-- [ ] 3.11 测试 · refresh 失败场景:文件不可读时返回结构化错误,不返回过期缓存(spec "Refresh failure degrades safely")
-- [ ] 3.12 跑 `python -m pytest tests/test_skill_indexer.py tests/test_cache.py -q` 全绿
-- [ ] 3.13 跑 `python -m pytest tests/functional -q` 零回归(外部行为未变)
-- [ ] 3.14 跑全量 `python -m pytest -q`,记录最终通过数
+- [x] 3.1 `list_skills()` 改为从 `metadata_cache` 读当前非过期条目
+- [x] 3.2 `current_index()` 改为从 `metadata_cache` 聚合返回(返回形状 `dict[str, SkillMetadata]` 不变)
+- [x] 3.3 `refresh()` 改为 `metadata_cache.clear()` + `doc_cache.clear()` + `build_index()`,删除 `self._index = {}`
+- [x] 3.4 `build_index()` 内部移除对 `self._index` 的写入,仅写 `metadata_cache`
+- [x] 3.5 从 `SkillIndexer` 类彻底删除 `self._index` 属性定义
+- [x] 3.6 测试 · cache miss 路径:条目缺失时自动磁盘重建并回填(spec "Cache miss triggers a clean rebuild")
+- [x] 3.7 测试 · metadata version bump:frontmatter version 递增后旧条目不再命中(spec "Version bump supersedes a cached metadata entry")
+- [x] 3.8 测试 · doc version bump:SKILL.md 正文变化 + version 递增后旧 doc 条目不再命中(spec "Version bump supersedes a cached document")
+- [x] 3.9 测试 · 整池 clear 后 list / read 结果与带缓存路径 content-identical(spec "Cached and rebuilt values are interchangeable")
+- [x] 3.10 测试 · refresh 后 `metadata_cache.currsize == 0` 且 `doc_cache.currsize == 0`(spec "Refresh skills index" / "Metadata and document entries honor a common invalidation surface")
+- [x] 3.11 测试 · refresh 失败场景:文件不可读时返回结构化错误,不返回过期缓存(spec "Refresh failure degrades safely")
+- [x] 3.12 跑 `python -m pytest tests/test_skill_indexer.py tests/test_cache.py -q` 全绿
+- [x] 3.13 跑 `python -m pytest tests/functional -q` 零回归(外部行为未变)
+- [x] 3.14 跑全量 `python -m pytest -q`,记录最终通过数
 
 ---
 
@@ -149,13 +149,13 @@
 - 不触发全量回归重跑 > 1 次;相信 Stage C 的 3.14 结果
 - Stage D 做完即本 change 完成,无需保留任何 Stage 间上下文
 
-- [ ] 4.1 更新 `docs/technical_design.md` §3.4 表格:"两层缓存" → "统一 cache contract + 两种使用场景"
-- [ ] 4.2 在 `docs/technical_design.md` §3.4 末尾追加"进程生命周期与缓存有效性"小段(对应 design.md Risk R3)
-- [ ] 4.3 检查并同步中文镜像 `docs/技术方案文档.md` §3.4(若存在)
-- [ ] 4.4 `docs/dev_plan.md` 尾部新增 "Cache Layer Formalization (formalize-cache-layers)" 小节,标记 Stage A–D 完成日期
-- [ ] 4.5 确认 `docs/requirements.md` §6.1 和 §5.1 F2 无需改动(行为未变)
-- [ ] 4.6 跑最终全量 `python -m pytest -q`,记录套数与通过率
-- [ ] 4.7 跑 `openspec validate formalize-cache-layers` 通过
-- [ ] 4.8 产出 `openspec/changes/formalize-cache-layers/closeout.md`:摘要 + 测试套数 + 命中率观测 + 后续 backlog(OQ1 metadata TTL 默认值、OQ2 version 字段缺失降级、OQ3 `current_index()` 长期去留)
-- [ ] 4.9 自检:`git diff --stat src/ tests/` 为空(Stage D 零代码改动);`git diff --stat docs/` 仅覆盖 `technical_design.md` / `dev_plan.md` / 镜像文件
-- [ ] 4.10 本 change 准备 archive:运行 `/opsx:archive formalize-cache-layers`(不在本文件执行,由用户决策触发)
+- [x] 4.1 更新 `docs/technical_design.md` §3.4 表格:"两层缓存" → "统一 cache contract + 两种使用场景"
+- [x] 4.2 在 `docs/technical_design.md` §3.4 末尾追加"进程生命周期与缓存有效性"小段(对应 design.md Risk R3)
+- [x] 4.3 检查并同步中文镜像 `docs/技术方案文档.md` §3.4(若存在)
+- [x] 4.4 `docs/dev_plan.md` 尾部新增 "Cache Layer Formalization (formalize-cache-layers)" 小节,标记 Stage A–D 完成日期
+- [x] 4.5 确认 `docs/requirements.md` §6.1 和 §5.1 F2 无需改动(行为未变)
+- [x] 4.6 跑最终全量 `python -m pytest -q`,记录套数与通过率
+- [x] 4.7 跑 `openspec validate formalize-cache-layers` 通过
+- [x] 4.8 产出 `openspec/changes/formalize-cache-layers/closeout.md`:摘要 + 测试套数 + 命中率观测 + 后续 backlog(OQ1 metadata TTL 默认值、OQ2 version 字段缺失降级、OQ3 `current_index()` 长期去留)
+- [x] 4.9 自检:`git diff --stat src/ tests/` 为空(Stage D 零代码改动);`git diff --stat docs/` 仅覆盖 `technical_design.md` / `dev_plan.md` / 镜像文件
+- [x] 4.10 本 change 准备 archive:运行 `/opsx:archive formalize-cache-layers`(由用户决策触发)

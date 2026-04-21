@@ -549,3 +549,46 @@ Remaining Phase B items left intentionally open:
 - **10.10 SKILL.md SOP bodies** — skeletons with `<!-- Phase B 前补齐 -->`
   retained; SOP depth is deferred to the next iteration since the runnability
   contract does not depend on SOP text.
+
+---
+
+## Addendum — Cache Layer Formalization (`formalize-cache-layers`)
+
+**Source change**: `openspec/changes/formalize-cache-layers/`
+**Completion**: Stage A 2026-04-19, Stages B/C/D 2026-04-20
+
+Narrow-scope internal refactor: promotes skill metadata from an implicit
+private dict inside `SkillIndexer` to a formal `VersionedTTLCache`
+instance that shares one contract with the existing document cache.
+External behaviour of MCP entry points (`list_skills`, `read_skill`,
+`refresh_skills`), hook entry points, and SQLite-persisted
+`SessionState.skills_metadata` is unchanged.
+
+Stage deliverables:
+- **Stage A** (discovery): inventory of existing read/write points for
+  `SkillIndexer._index` and `VersionedTTLCache` — recorded in change-local
+  `stageA_notes.md`. Zero code change.
+- **Stage B** (abstraction): added `metadata_cache` keyword-only
+  parameter + read-only property on `SkillIndexer`; shadow-writes during
+  `build_index`; legacy `cache=` keeps working under `DeprecationWarning`
+  mapping to `doc_cache`.
+- **Stage C** (migration): removed `SkillIndexer._index`; replaced with a
+  lightweight `_indexed_skills` registry (`skill_id → (version, source_path)`);
+  `list_skills` / `current_index` / `read_skill` now route through the
+  metadata cache with disk-rebuild fallback on miss; `refresh()` clears both
+  cache layers within one call. Six new scenario tests in
+  `tests/test_skill_indexer.py::TestStageC_CacheLayerFormalization` and
+  four shared-contract tests in new `tests/test_cache.py`.
+- **Stage D** (closeout): synced `docs/technical_design.md` §3.4 and mirror
+  `docs/技术方案文档.md` §3.4; full regression **204 passed**; zero
+  consumer-side code change (`mcp_server.py`, `hook_handler.py`,
+  `tool_rewriter.py`, `prompt_composer.py`, `langchain_tools.py` untouched).
+
+Deferred to a follow-up change (not archived with this one):
+- Metadata-specific TTL tuning (OQ1 in design.md) — currently shares
+  doc-cache default (300s / 100 entries).
+- Version-field-missing degradation hardening (OQ2) — still silently
+  shares `"unknown"` slot.
+- Legacy `cache=` alias removal — still accepted under
+  `DeprecationWarning`; production callers (`bootstrap.py`, functional
+  fixtures) already migrated to `doc_cache=` keyword.

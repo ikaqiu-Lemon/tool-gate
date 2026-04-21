@@ -18,7 +18,7 @@ from ._support.runtime import fixtures_skills_dir
 
 class TestFixtureIndexerSkipsInvalid:
     def test_valid_mocks_indexed_invalid_skipped(self) -> None:
-        indexer = SkillIndexer(fixtures_skills_dir(), VersionedTTLCache())
+        indexer = SkillIndexer(fixtures_skills_dir(), doc_cache=VersionedTTLCache())
         index = indexer.build_index()
         ids = set(index.keys())
 

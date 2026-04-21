@@ -592,3 +592,116 @@ Deferred to a follow-up change (not archived with this one):
 - Legacy `cache=` alias removal — still accepted under
   `DeprecationWarning`; production callers (`bootstrap.py`, functional
   fixtures) already migrated to `doc_cache=` keyword.
+
+---
+
+## Addendum — Runtime vs Persisted Session State (`separate-runtime-and-persisted-state`)
+
+**Source change**: `openspec/changes/separate-runtime-and-persisted-state/`
+**Completion**: Stages A/B/C/D 2026-04-21
+
+Internal semantic refactor at the **L1 (session) layer**: introduces an
+explicit runtime-only `RuntimeContext` that hook handlers build once
+per turn from the loaded `SessionState` + live `SkillIndexer`.  The
+persisted record is narrowed to recovery / continuity / audit fields;
+derived fields (`active_tools`, `skills_metadata`) are runtime-authoritative
+and kept on `SessionState` only as a compat mirror for unmigrated
+consumers.  External behaviour of MCP entry points, hook entry points,
+SQLite schema, cache layers (§3.4), and observability is unchanged.
+
+Stage deliverables:
+
+- **Stage A** (inventory): field classification + entry-flow catalog
+  recorded in change-local `stageA_notes.md`; field comments in
+  `models/state.py`; two skip-marked C3 contract tests.  Baseline: 204 passed.
+- **Stage B** (boundary introduction): `core/runtime_context.py` with
+  `RuntimeContext` + `build_runtime_context`; `SessionState.to_persisted_dict` + `DERIVED_FIELDS`; `ToolRewriter.blocked_tools` readonly property;
+  `hook_handler` wires ctx into `_classify_deny_bucket` and
+  `handle_post_tool_use` lookup.  Tests: 7 new in `test_runtime_context.py`.
+- **Stage C** (rewrite / compose migration): `tool_rewriter.compute_active_tools(ctx)`; composer union-typed `SessionState | RuntimeContext`
+  signatures with legacy fallback; all 4 hook handlers follow the
+  explicit `load → derive → rewrite/compose/gate → persist` lifecycle;
+  `SessionState.sync_from_runtime` compat shim; 11 new tests across
+  `test_tool_rewriter`, `test_prompt_composer`, and new
+  `tests/test_hook_lifecycle.py` (integration-style with real
+  `GovernanceRuntime` in tmp dirs).
+- **Stage D** (closeout): full regression **222 passed, 2 skipped**;
+  `openspec validate` clean; docs addenda here + in §3 of
+  `docs/technical_design.md`; change closeout at
+  `openspec/changes/separate-runtime-and-persisted-state/closeout.md`.
+  Zero change to SQLite schema, `.mcp.json`, `hooks/hooks.json`,
+  `config/default_policy.yaml`, or any consumer-side return shape.
+
+Deferred to a follow-up change (not archived with this one):
+
+- **C3 serialization exclusion**: `state_manager.save` still dumps the
+  full pydantic model; `SessionState.to_persisted_dict` exists but is
+  not yet used on the save path.  Two contract tests in
+  `tests/test_state_manager.py::TestPersistedFieldContract` wait for
+  the flip.
+- **MCP meta-tool migration**: the 8 `@mcp.tool` entries in `mcp_server.py`
+  still read `state.active_tools` (kept in sync by
+  `SessionState.sync_from_runtime`).  They have not been migrated to
+  the runtime-view-first pattern.
+- **`recompute_active_tools(state)` DeprecationWarning**: deferred to
+  avoid warning-noise while MCP callers still use the legacy path.
+- **`grant_expired → runtime view skip` regression test**: Stage A/B
+  cover `cleanup_expired` semantics; an explicit ctx-visibility test
+  for expired grants was not added this round.
+
+---
+
+## Addendum — Demo Workspace Onboarding Hardening (`harden-demo-workspace-onboarding`)
+
+**Source change**: `openspec/changes/harden-demo-workspace-onboarding/`
+**Completion**: Stages A–D 2026-04-21 (docs-only; no governance core touched)
+
+Narrow-scope documentation hardening targeting zero-knowledge readers of
+the three demo workspaces under `examples/`. Motivated by a concrete
+reproduction: readers following the old workspace README §2 executed
+`pip install -e ".[dev]"` from inside a workspace directory and hit
+`ERROR: file:///.../examples/01-knowledge-link does not appear to be a
+Python project`.
+
+Deliverables:
+
+- `examples/QUICKSTART.md` (new, ~234 lines) — single shared entry
+  document covering install / plugin-hooks-MCP wiring / double-path
+  first-run (Method B offline `tg-hook` replay as default, Method A
+  Claude Code CLI as advanced) / verify SQL / reset command /
+  troubleshooting catalog (8+ failure classes, indexed by symptom).
+- Rewritten `examples/01-knowledge-link/README.md`,
+  `examples/02-doc-edit-staged/README.md`,
+  `examples/03-lifecycle-and-risk/README.md` — preflight box, §2
+  cleaned of install noise and promoted to Method-B-first with
+  workspace-scoped replay examples, §5.3 Verify and §8 Reset +
+  workspace-specific troubleshooting added. `§3` operations table,
+  `§4` system behavior, `§5.1` audit rows, `§5.2` 실측 record,
+  `§6` contract table, and `§7` code anchors preserved verbatim.
+- `scripts/check-demo-env.sh` (new) — POSIX-sh preflight that checks
+  Python 3.11+, `tg-hook` / `tg-mcp` / `claude` on PATH, per-workspace
+  `.mcp.json` JSON validity, and `mcp/*.py` syntactic validity.
+  Outputs ✅/⚠️/❌; exits non-zero only on ❌.
+- `examples/03-lifecycle-and-risk/config/demo_policy.fast.yaml` (new)
+  — TTL-only variant of the main policy (`default_ttl: 60`,
+  `yuque-knowledge-link.max_ttl: 5`) so the live-demo expiry loop
+  completes in seconds rather than 120s. All non-TTL fields must
+  stay in lockstep with `demo_policy.yaml`.
+- Root `examples/README.md` — two minimal cross-links: top-of-§2
+  callout pointing zero-knowledge readers to QUICKSTART; end-of-§5
+  pointer to the shared troubleshooting catalog.
+
+Runtime catch during Stage B self-test: `tg-hook`'s stdin protocol
+reads the `event` key, not the `hook_event_name` key that the root
+`examples/README.md §5.1` template used; the old aspirational
+examples returned `{}` silently. QUICKSTART §3.1 uses the correct
+key and documents real stdout shapes (SessionStart →
+`additionalContext`; PreToolUse on out-of-scope tool →
+`hookSpecificOutput.permissionDecision: "deny"`). QUICKSTART §6
+T-9 catalogs the `{}` symptom. The spec remained unchanged — the
+issue was a template-vs-runtime discrepancy, not a capability delta.
+
+Archive order: archived after `add-delivery-demo-workspaces`
+(delivery-demo-harness spec already promoted to
+`openspec/specs/delivery-demo-harness/` when the predecessor change
+was archived 2026-04-21).

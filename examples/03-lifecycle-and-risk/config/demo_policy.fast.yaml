@@ -1,0 +1,27 @@
+# Demo policy for example 03 — lifecycle-and-risk · **FAST variant (live-demo speedup)**
+#
+# Minimal diff vs demo_policy.yaml: only TTL fields shortened so TTL-expiry
+# demo can run in seconds instead of minutes. Every other field MUST stay
+# identical to demo_policy.yaml — if you add / change non-TTL policy fields,
+# update this file in lockstep or the two variants will drift.
+#
+# Use this file in place of demo_policy.yaml during live demos by pointing
+# GOVERNANCE_CONFIG_DIR at a directory where this is named demo_policy.yaml,
+# or by temporary symlink `ln -sf demo_policy.fast.yaml demo_policy.yaml`.
+
+default_risk_thresholds:
+  low: auto
+  medium: reason
+  high: approval
+
+default_ttl: 60             # was 3600 — keep session-default short for the demo
+default_scope: session
+
+skill_policies:
+  yuque-knowledge-link:
+    max_ttl: 5              # was 120 — sub-10s expiry so `sleep 6` + rerun works live
+  yuque-bulk-delete:
+    approval_required: true
+
+blocked_tools:
+  - yuque_delete_doc

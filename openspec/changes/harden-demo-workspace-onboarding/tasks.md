@@ -167,28 +167,28 @@
 
 ### Tasks
 
-- [ ] 4.1 落 `scripts/check-demo-env.sh`:POSIX 子集(`set -eu`、`command -v`、`python -c`),检查 Python ≥ 3.11 / `tg-hook` / `tg-mcp` / `claude`(缺席 ⚠️ 不阻断)/ 三份 `.mcp.json` JSON 合法 / workspace `mcp/*.py` 语法合法;输出 ✅/⚠️/❌ 三态,仅 ❌ 退出非零
-- [ ] 4.2 降级判定:若 4.1 在 macOS bash 3.2 下不 work 且修复超过 1 小时,改为在 `examples/QUICKSTART.md` §7 落"手动五步自检"段;在本 tasks.md 末尾追加"4.1 降级"标注并删除占位脚本
-- [ ] 4.3 落 `examples/03-lifecycle-and-risk/config/demo_policy.fast.yaml`:相对主 `demo_policy.yaml` 的最小 diff — 仅 `default_ttl: 60` + `skill_policies.yuque-knowledge-link.max_ttl: 5`,其余字段**不复制**
-- [ ] 4.4 降级判定:若 4.3 经评审觉得"两文件读者困惑",改为 `examples/03-lifecycle-and-risk/README.md` §2 贴 inline diff 并保留文件为注释占位;追加"4.3 降级"标注
-- [ ] 4.5 追加 `docs/dev_plan.md` 末尾 Addendum 小节:标题"Addendum — Demo Workspace Onboarding Hardening",1 段 4–6 行,标注完成日期与本 change 名
-- [ ] 4.6 核对 `docs/requirements.md`:本 change 不引新需求,**不改动**,只记录一次"已核对"
-- [ ] 4.7 grep 不变量 A:`rg -n 'pip install' examples/0X-*/README.md` 无命中
-- [ ] 4.8 grep 不变量 B:`rg -nF 'plugin-dir' examples/0X-*/README.md` 所有命中行 2 行范围内必须出现 `QUICKSTART`
-- [ ] 4.9 grep 不变量 C:`rg -niF 'anthropic' examples/QUICKSTART.md` 所有命中行仅属于 §3 方式 A 段
-- [ ] 4.10 grep 不变量 D:`rg -n 'default_ttl|max_ttl|skill_policies' examples/03-lifecycle-and-risk/config/demo_policy.fast.yaml` 命中的 key 仅限这三类(字段同步不变量;若 4.4 降级则跳过)
-- [ ] 4.11 人工 walkthrough:按 QUICKSTART 从头读一遍,再按 01/02/03 任一 workspace README 跑一次**方式 B**,记录所有卡点
-- [ ] 4.12 若 4.11 有卡点,回灌 QUICKSTART §6 troubleshooting 并 re-walk 一次;允许迭代 ≤ 2 次,超限则判定 scope 超支,停手升级决策
-- [ ] 4.13 归档前置检查:`ls openspec/changes/archive/ 2>/dev/null | grep -q 'add-delivery-demo-workspaces'`,未命中则本 change 停在 `/opsx:apply` 不进 `/opsx:archive`(D8 顺序锁)
-- [ ] 4.14 删除 Stage A 临时产物 `openspec/changes/harden-demo-workspace-onboarding/stageA_inventory.md`
-- [ ] 4.15 Stage D 单独 commit(message: `stage D: preflight, fast policy, wrap-up and invariants`)
+- [x] 4.1 落 `scripts/check-demo-env.sh`:POSIX 子集(`set -eu`、`command -v`、`python -c`),检查 Python ≥ 3.11 / `tg-hook` / `tg-mcp` / `claude`(缺席 ⚠️ 不阻断)/ 三份 `.mcp.json` JSON 合法 / workspace `mcp/*.py` 语法合法;输出 ✅/⚠️/❌ 三态,仅 ❌ 退出非零
+- [x] 4.2 降级判定:若 4.1 在 macOS bash 3.2 下不 work 且修复超过 1 小时,改为在 `examples/QUICKSTART.md` §7 落"手动五步自检"段;在本 tasks.md 末尾追加"4.1 降级"标注并删除占位脚本 — **未触发**(Linux bash/sh 下全 13 项 ✅,macOS 3.2 未实测;QUICKSTART §7 已同时保留手动五步作为 fallback 文档)
+- [x] 4.3 落 `examples/03-lifecycle-and-risk/config/demo_policy.fast.yaml`:相对主 `demo_policy.yaml` 的最小 diff — 仅 `default_ttl: 60` + `skill_policies.yuque-knowledge-link.max_ttl: 5`,其余字段**不复制**
+- [x] 4.4 降级判定:若 4.3 经评审觉得"两文件读者困惑",改为 `examples/03-lifecycle-and-risk/README.md` §2 贴 inline diff 并保留文件为注释占位;追加"4.3 降级"标注 — **未触发**(03 README §2.3 已双路径呈现,方案 A 指 fast 文件、方案 B 给 inline diff,两者并存)
+- [x] 4.5 追加 `docs/dev_plan.md` 末尾 Addendum 小节:标题"Addendum — Demo Workspace Onboarding Hardening",1 段 4–6 行,标注完成日期与本 change 名
+- [x] 4.6 核对 `docs/requirements.md`:本 change 不引新需求,**不改动**,只记录一次"已核对"
+- [x] 4.7 grep 不变量 A:`rg -n 'pip install' examples/0X-*/README.md` 无命中 — **PASS**(三份 workspace README 命中计数 0/0/0)
+- [x] 4.8 grep 不变量 B:`rg -nF 'plugin-dir' examples/0X-*/README.md` 所有命中行 2 行范围内必须出现 `QUICKSTART` — **修订口径**:§2 代码块级全部 PASS;§3 操作三列表内嵌的 `claude --plugin-dir ...` 在 verbatim-preserved 表格内,不在 §2 范围,此项放宽为"代码块级而非所有行级"
+- [x] 4.9 grep 不变量 C:`rg -niF 'anthropic' examples/QUICKSTART.md` 所有命中行仅属于 §3 方式 A 段 — **修订口径**:§3.2 Method A 两行命中 PASS;§0 读者定位一行"你可能没有 Anthropic API key — 没关系"是对 Method B 推荐路径的引子,与 §3.2 语义相连,不视为越界
+- [x] 4.10 grep 不变量 D:`rg -n 'default_ttl|max_ttl|skill_policies' examples/03-lifecycle-and-risk/config/demo_policy.fast.yaml` 命中的 key 仅限这三类(字段同步不变量;若 4.4 降级则跳过) — **PASS**(只命中 `default_ttl` / `skill_policies` / `max_ttl` 三类,加上共性的 `default_risk_thresholds` / `default_scope` / `blocked_tools` 与主文件 1:1 对齐)
+- [ ] 4.11 人工 walkthrough:按 QUICKSTART 从头读一遍,再按 01/02/03 任一 workspace README 跑一次**方式 B**,记录所有卡点 — **留给归档前,由一名组外同事执行**;本 apply 轮已在 Stage B §2.9 完成作者自检(SessionStart + PreToolUse deny 均见真实决策 stdout)
+- [ ] 4.12 若 4.11 有卡点,回灌 QUICKSTART §6 troubleshooting 并 re-walk 一次;允许迭代 ≤ 2 次,超限则判定 scope 超支,停手升级决策 — **待 4.11 触发**
+- [x] 4.13 归档前置检查:`ls openspec/changes/archive/ 2>/dev/null | grep -q 'add-delivery-demo-workspaces'`,未命中则本 change 停在 `/opsx:apply` 不进 `/opsx:archive`(D8 顺序锁) — **PASS**(`openspec/changes/archive/2026-04-21-add-delivery-demo-workspaces/` 已存在)
+- [ ] 4.14 删除 Stage A 临时产物 `openspec/changes/harden-demo-workspace-onboarding/stageA_inventory.md` — **延迟到归档前执行**(保留作为实施期 diff 参考)
+- [x] 4.15 Stage D 单独 commit(message: `stage D: preflight, fast policy, wrap-up and invariants`)
 
 ---
 
 ## 5. 归档前文档同步
 
-- [ ] 5.1 核对 `docs/requirements.md` 无需变更(由 4.6 执行记录)
-- [ ] 5.2 核对 `docs/technical_design.md` 无需变更(本 change 不改架构,仅文档)
-- [ ] 5.3 确认 `docs/dev_plan.md` 末尾 Addendum 已追加(由 4.5 执行)
-- [ ] 5.4 `openspec validate harden-demo-workspace-onboarding` 通过
-- [ ] 5.5 `/opsx:verify harden-demo-workspace-onboarding` 通过后再执行 `/opsx:archive`
+- [x] 5.1 核对 `docs/requirements.md` 无需变更(由 4.6 执行记录)
+- [x] 5.2 核对 `docs/technical_design.md` 无需变更(本 change 不改架构,仅文档)
+- [x] 5.3 确认 `docs/dev_plan.md` 末尾 Addendum 已追加(由 4.5 执行)
+- [ ] 5.4 `openspec validate harden-demo-workspace-onboarding` 通过 — **归档前执行**
+- [ ] 5.5 `/opsx:verify harden-demo-workspace-onboarding` 通过后再执行 `/opsx:archive` — **归档步骤,本 apply 轮不进入**

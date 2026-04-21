@@ -116,12 +116,12 @@
 - [x] 3.4 Workspace 01 · 新增 reset 段:`rm -rf ./.demo-data` 与安全口径一句
 - [x] 3.5 Workspace 01 · 新增本 workspace 专属 troubleshooting 段:`refresh_skills 插曲未生效` / `skills_incoming 拷贝后未重算` 等 01 独有条目;共性症状只回指 QUICKSTART §6
 - [x] 3.6 Workspace 01 · 核验 `rg -nF 'pip install' examples/01-knowledge-link/README.md` 无命中;`rg -nF 'plugin-dir' examples/01-knowledge-link/README.md` 命中行附近含 "QUICKSTART";commit(message: `stage C-01: migrate 01-knowledge-link README`)
-- [ ] 3.7 Workspace 02 · 骨架重排(同 3.1)
-- [ ] 3.8 Workspace 02 · 清理共性段(同 3.2)
-- [ ] 3.9 Workspace 02 · 新增 verify 段:覆盖 §5.1 期望的 `skill.enable denied reason=reason_missing` / `stage.change analysis → execution` / `whitelist_violation stage=analysis` / `tool.call run_command decision=deny reason=blocked` 关键行
-- [ ] 3.10 Workspace 02 · 新增 reset 段
-- [ ] 3.11 Workspace 02 · 新增本 workspace 专属 troubleshooting 段:`stage 未切换导致 yuque_update_doc 被拦` / `run_command 被 blocked_tools 兜底` / `enable 无 reason 被拒` 等 02 独有条目
-- [ ] 3.12 Workspace 02 · 核验 grep 不变量;commit(message: `stage C-02: migrate 02-doc-edit-staged README`)
+- [x] 3.7 Workspace 02 · 骨架重排(同 3.1)
+- [x] 3.8 Workspace 02 · 清理共性段(同 3.2)
+- [x] 3.9 Workspace 02 · 新增 verify 段:覆盖 §5.1 期望的 `skill.enable denied reason=reason_missing` / `stage.change analysis → execution` / `whitelist_violation stage=analysis` / `tool.call run_command decision=deny reason=blocked` 关键行
+- [x] 3.10 Workspace 02 · 新增 reset 段
+- [x] 3.11 Workspace 02 · 新增本 workspace 专属 troubleshooting 段:`stage 未切换导致 yuque_update_doc 被拦` / `run_command 被 blocked_tools 兜底` / `enable 无 reason 被拒` 等 02 独有条目
+- [x] 3.12 Workspace 02 · 核验 grep 不变量;commit(message: `stage C-02: migrate 02-doc-edit-staged README`)
 - [ ] 3.13 Workspace 03 · 骨架重排(同 3.1)
 - [ ] 3.14 Workspace 03 · 清理共性段(同 3.2)
 - [ ] 3.15 Workspace 03 · 新增 verify 段:覆盖 §5.1 期望的 `grant.expire` / `grant.revoke` / `skill.disable`(严格顺序)/ `skill.enable decision=denied reason=approval_required` / `tool.call yuque_delete_doc decision=deny reason=blocked` / `skills.index.refresh` 关键行

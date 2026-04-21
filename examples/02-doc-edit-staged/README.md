@@ -2,6 +2,8 @@
 
 > 本样例展示 tool-gate 在**中风险 + 需要写入**的场景下如何落地"先理解、再修改"的两阶段工作流,同时通过 `blocked_tools` 演示全局红线。
 
+> ⚠️ **Preflight**:本 workspace **不负责**项目安装。先读 [`../QUICKSTART.md`](../QUICKSTART.md)(§1 概念 + wiring / §2 零知识安装 / §7 preflight 自检),按 §2 在**仓库根**完成一次性安装之后再回来跑本样例。workspace 目录仅负责 demo run。
+
 ---
 
 ## 0. 业务背景与展示目标
@@ -25,16 +27,9 @@
 
 ---
 
-## 2. 演示前置
+## 2. 演示前置与启动
 
-### 2.1 一次性环境准备
-
-```bash
-# 在仓库根执行
-pip install -e ".[dev]"     # 安装 tool-gate + FastMCP + jsonschema
-```
-
-### 2.2 进入 workspace 启动
+### 2.1 环境变量(两条路径都要导出)
 
 ```bash
 cd examples/02-doc-edit-staged/
@@ -42,20 +37,34 @@ cd examples/02-doc-edit-staged/
 export GOVERNANCE_DATA_DIR="$PWD/.demo-data"
 export GOVERNANCE_SKILLS_DIR="$PWD/skills"
 export GOVERNANCE_CONFIG_DIR="$PWD/config"
-
-# 方式 A · Claude Code CLI
-claude --plugin-dir ../../ --mcp-config ./.mcp.json
-
-# 方式 B · mock 握手冒烟
-python ./mcp/mock_yuque_stdio.py
-python ./mcp/mock_shell_stdio.py         # 启动时也会自检;运行后任何调用都会被 PreToolUse 拦截
 ```
 
-### 2.3 Phase B 已交付
+三个 env var 的作用与缺失时的症状见 [`../QUICKSTART.md §1.3`](../QUICKSTART.md#13--三个-governance_-环境变量)。
 
-- ✅ `mcp/mock_yuque_stdio.py`:yuque_get_doc(含 `version` 字段用于并发版本演示)/ yuque_list_docs / yuque_update_doc
-- ✅ `mcp/mock_shell_stdio.py`:run_command(**混杂变量工具**,module docstring 首段固化免责声明)
-- ✅ 启动自检:两个 mock 都会在 `mcp.run()` 之前跑 `jsonschema.validate`
+### 2.2 启动(两条路径,方式 B 首推)
+
+**方式 B · 离线子进程 replay**(零 API key,决策 stdout 可见;通用模板见 [`../QUICKSTART.md §3.1`](../QUICKSTART.md#31--方式-b--子进程-replayoffline--免-api-key))
+
+```bash
+# SessionStart:期望 stdout 含 additionalContext 列出 "Yuque Doc Edit (medium)"
+echo '{"event":"SessionStart","session_id":"02","cwd":"'"$PWD"'"}' | tg-hook
+
+# PreToolUse on run_command(全局 blocked_tools,始终拦截):期望 permissionDecision:"deny"
+echo '{"event":"PreToolUse","session_id":"02","tool_name":"run_command","tool_input":{}}' | tg-hook
+
+# PreToolUse on yuque_update_doc(未 enable + stage=analysis 未切换):期望 permissionDecision:"deny"
+echo '{"event":"PreToolUse","session_id":"02","tool_name":"yuque_update_doc","tool_input":{}}' | tg-hook
+```
+
+实测 stdout 见 §5.2。方式 B replay **不写审计**,完整审计链(`reason_missing` / `stage.change` / `blocked` bucket 区分)走方式 A。
+
+**方式 A · Claude Code CLI**(需 Anthropic API key;完整交互演示)
+
+```bash
+claude --plugin-dir ../../ --mcp-config ./.mcp.json
+```
+
+启动后按 §3 操作三列表逐行演示。链路概览见 [`../QUICKSTART.md §3.2`](../QUICKSTART.md#32--方式-a--claude-code-cli进阶需-anthropic-api-key--联网)。
 
 ---
 
@@ -115,7 +124,20 @@ created_at                         event                subject                 
 "tool `run_command` is in global blocked_tools and cannot be enabled by any skill."
 ```
 
-> **实测记录**(Phase B 填写):<!-- Phase B 填写:实际 stdout 与本节形状差异 -->
+> **实测记录 · `tg-hook` 子进程退化路径(2026-04-21)**:
+>
+> 方式:`cd examples/02-doc-edit-staged && GOVERNANCE_DATA_DIR=/tmp/tg-demo-02 GOVERNANCE_SKILLS_DIR=$PWD/skills GOVERNANCE_CONFIG_DIR=$PWD/config`,事件通过 `echo '{"event":"<Name>",...}' | tg-hook` 送入。
+>
+> - **`SessionStart`** → `additionalContext` 列出 1 个中风险技能 `Yuque Doc Edit (medium)`,`SkillIndexer` 发现正常
+> - **`PreToolUse` `run_command`**(`blocked_tools` 列表项 + 未 enable)→ `{"permissionDecision":"deny","permissionDecisionReason":"Tool 'run_command' is not in active_tools. …"}`
+> - **`PreToolUse` `yuque_update_doc`**(未 enable)→ 同上形状
+> - **`governance.db.audit_log`** 新增 2 行 `tool.call / deny / error_bucket=whitelist_violation`
+>
+> **差异**:`reason_missing` / `stage.change` / `blocked` bucket 需要走 `enable_skill` + `change_stage` 元工具链,子进程退化在未 enable 前所有拒绝都归 `whitelist_violation` 一类;§5.2 上方代码块的三类针对性 `additionalContext`(`reason_missing` / stage 不匹配 / `blocked_tools`)待 Claude CLI 交付现场补录。
+
+### 5.3 Verify(通用 SQL 见 QUICKSTART §4)
+
+按 [`../QUICKSTART.md §4`](../QUICKSTART.md#4--verify-通用套路) 的 SQL 模板查询 `$GOVERNANCE_DATA_DIR/governance.db`。**方式 A 完整跑完**时,期望看到 §5.1 列出的 8 行审计 —— 关键核验点:`skill.enable decision=denied reason=reason_missing` 先于 `skill.enable decision=granted`;`stage.change analysis → execution` 后 `tool.call yuque_update_doc stage=execution decision=allow`;`tool.call run_command decision=deny reason=blocked`(注意 `reason=blocked` 区别于白名单越界的 `whitelist_violation`)。**只跑方式 B** 时审计表为空或不存在是预期。
 
 ---
 
@@ -142,3 +164,26 @@ created_at                         event                subject                 
   - `tests/functional/test_functional_stage.py` — `change_stage` + `stage.change` 审计
   - `tests/functional/test_functional_policy_e2e.py::E6` — `require_reason` 双分支
   - `tests/functional/test_functional_policy_e2e.py::E4` — `blocked_tools` 剥离 + PreToolUse deny
+
+---
+
+## 8. Reset 与本 workspace 专属 troubleshooting
+
+### 8.1 Reset(跑第二次前清理 demo 状态)
+
+```bash
+cd examples/02-doc-edit-staged/
+rm -rf ./.demo-data
+```
+
+只删本 workspace 的 `.demo-data/`(含 `governance.db`);**不要触碰** `skills/`、`mcp/`、`schemas/`、`contracts/`、`config/`、`.mcp.json` —— 它们是演示资产本身。通用安全口径见 [`../QUICKSTART.md §5`](../QUICKSTART.md#5--reset-通用套路)。
+
+### 8.2 本 workspace 专属 troubleshooting
+
+共性症状(pip 错目录、`tg-hook` 返回 `{}`、`GOVERNANCE_*` 未导出、`.mcp.json` 相对路径断裂等)见 [`../QUICKSTART.md §6`](../QUICKSTART.md#6--troubleshooting8-类常见启动失败)。本 workspace 独有症状如下:
+
+| 症状 | 根因 | 验证 | 修复 |
+|---|---|---|---|
+| 第一次 `enable_skill("yuque-doc-edit")` 返回 `decision=denied reason=reason_missing`,像是"坏了" | 本 workspace 策略 `require_reason: true`;中风险技能必须带 `reason` 才能启用 —— 这是**预期行为**,不是失败 | 读 `config/demo_policy.yaml` 中 `skill_policies.yuque-doc-edit.require_reason` | 在 `enable_skill` 的第二次调用里传 `reason="..."` 参数;见 §3 时间戳 11:15:15 行 |
+| `change_stage("yuque-doc-edit","execution")` 之前 `yuque_update_doc` 被 `whitelist_violation` 拒,不是 `stage_mismatch` | 旧版 `error_bucket` 只分 `whitelist_violation` / `blocked` / `reason_missing` / `approval_required` 四类,stage 不匹配目前归类 `whitelist_violation`;文案会提示"stage=analysis" | 读 §5.1 倒数第 3 行 `tool.call whitelist_violation yuque_update_doc stage=analysis` | 调 `change_stage("yuque-doc-edit","execution")` 后重试;从 stdout 的 `additionalContext` 能看到 stage 切换提示 |
+| `run_command` 任何时候都被 deny,即使 `yuque-doc-edit` 已启用到 execution stage | `run_command` 在**全局** `blocked_tools` 列表(`config/demo_policy.yaml`),优先级高于任何 skill 授权 —— 这是 §4 "两层防线"第二层的预期;`reason` 字段 = `blocked`(不是 `whitelist_violation`) | §5.1 最后一行 `tool.call run_command decision=deny reason=blocked` | 不修;`run_command` 是本样例的混杂变量工具,永不放行;见 §6 "⚠️ 混杂变量"声明 |

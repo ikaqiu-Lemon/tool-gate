@@ -24,6 +24,8 @@
 
 ## 2. 演示前置
 
+> 🆕 **新手读者**:先读 [`QUICKSTART.md`](./QUICKSTART.md)。它是三个样例共用的概念 + 安装 + 启动 + verify + reset + troubleshooting 入口,瘦身了各 workspace README 的前置章节。本节保留作为交付评审人的速查;零知识读者不必从这里开始。
+
 ### 2.1 环境要求
 
 - Python 3.11+
@@ -131,6 +133,8 @@ echo '{"hook_event_name":"PreToolUse","session_id":"demo","tool_name":"search_we
 - 6 份 `SKILL.md` 能被 `SkillIndexer` 扫到
 
 详见 `openspec/changes/add-delivery-demo-workspaces/tasks.md` §9。
+
+> 更完整的排障矩阵(pip 错目录、`tg-hook` 返回 `{}`、`GOVERNANCE_*` 未导出、`.mcp.json` 相对路径断裂等 8+ 类)见 [`QUICKSTART.md §6`](./QUICKSTART.md#6--troubleshooting8-类常见启动失败)。
 
 ---
 

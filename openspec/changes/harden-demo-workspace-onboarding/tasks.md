@@ -129,8 +129,8 @@
 - [x] 3.17 Workspace 03 · 新增本 workspace 专属 troubleshooting 段:`TTL 等待 / refresh 附录位置` / `两层防线现象分不清` 等 03 独有条目
 - [x] 3.18 Workspace 03 · §2 追加 fast policy 切换说明占位(单行:"加速现场演示改用 `config/demo_policy.fast.yaml`,详见 Stage D");本 stage 不落文件
 - [x] 3.19 Workspace 03 · 核验 grep 不变量;commit(message: `stage C-03: migrate 03-lifecycle-and-risk README`)
-- [ ] 3.20 根 `examples/README.md` §2 顶部追加:"新手先读 [`QUICKSTART.md`](./QUICKSTART.md)" + "可先跑 `bash scripts/check-demo-env.sh` 做环境自检(Stage D 产出,可能降级)"
-- [ ] 3.21 根 `examples/README.md` §5 末尾追加:"更完整的排障矩阵见 QUICKSTART §6";commit(message: `stage C-root: wire examples/README to QUICKSTART`)
+- [x] 3.20 根 `examples/README.md` §2 顶部追加:"新手先读 [`QUICKSTART.md`](./QUICKSTART.md)" + "可先跑 `bash scripts/check-demo-env.sh` 做环境自检(Stage D 产出,可能降级)"
+- [x] 3.21 根 `examples/README.md` §5 末尾追加:"更完整的排障矩阵见 QUICKSTART §6";commit(message: `stage C-root: wire examples/README to QUICKSTART`)
 
 ---
 

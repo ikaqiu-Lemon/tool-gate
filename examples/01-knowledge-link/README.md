@@ -2,6 +2,8 @@
 
 > 本样例展示 tool-gate 的**基础主流程**:一个新会话中,Claude 如何被引导从"看到技能目录 → 阅读 SOP → 启用技能 → 使用工具"一步步走过来;在这条链路上,**混杂工具会被真实拦住**。
 
+> ⚠️ **Preflight**:本 workspace **不负责**项目安装。先读 [`../QUICKSTART.md`](../QUICKSTART.md)(§1 概念 + wiring / §2 零知识安装 / §7 preflight 自检),按 §2 在**仓库根**完成一次性安装之后再回来跑本样例。workspace 目录仅负责 demo run。
+
 ---
 
 ## 0. 业务背景与展示目标
@@ -26,16 +28,9 @@
 
 ---
 
-## 2. 演示前置
+## 2. 演示前置与启动
 
-### 2.1 一次性环境准备
-
-```bash
-# 在仓库根执行
-pip install -e ".[dev]"     # 安装 tool-gate + FastMCP + jsonschema
-```
-
-### 2.2 进入 workspace 启动
+### 2.1 环境变量(两条路径都要导出)
 
 ```bash
 cd examples/01-knowledge-link/
@@ -43,26 +38,31 @@ cd examples/01-knowledge-link/
 export GOVERNANCE_DATA_DIR="$PWD/.demo-data"
 export GOVERNANCE_SKILLS_DIR="$PWD/skills"
 export GOVERNANCE_CONFIG_DIR="$PWD/config"
-
-# 方式 A · Claude Code CLI(完整交互演示)
-claude --plugin-dir ../../ --mcp-config ./.mcp.json
-
-# 方式 B · 不依赖 Claude CLI 的 mock 握手冒烟
-python ./mcp/mock_yuque_stdio.py         # 启动会自检 schema;读 stdin 走 MCP JSON-RPC
 ```
 
-### 2.3 自检与故障诊断
+三个 env var 的作用与缺失时的症状见 [`../QUICKSTART.md §1.3`](../QUICKSTART.md#13--三个-governance_-环境变量)。
 
-- 启动 mock 时如果 `[mock_yuque] sample for <tool> violates output schema` 则表示硬编码样本与 `schemas/*.schema.json` 漂移,优先核对契约
-- `GOVERNANCE_DATA_DIR` 指向空目录即可,tool-gate 会自动创建 `governance.db`
-- 本 workspace 的 mock 全部以**相对路径**方式在 `.mcp.json` 中注册 (`./mcp/*.py`),必须从 workspace 根启动
+### 2.2 启动(两条路径,方式 B 首推)
 
-### 2.4 Phase B 已交付
+**方式 B · 离线子进程 replay**(零 API key,决策 stdout 可见;通用模板见 [`../QUICKSTART.md §3.1`](../QUICKSTART.md#31--方式-b--子进程-replayoffline--免-api-key))
 
-- ✅ `mcp/mock_yuque_stdio.py`:yuque_search / yuque_list_docs / yuque_get_doc / yuque_update_doc / yuque_list_comments
-- ✅ `mcp/mock_web_search_stdio.py`:search_web(混杂变量)
-- ✅ `mcp/mock_internal_doc_stdio.py`:search_doc(混杂变量)
-- ✅ 启动自检:每个 mock 在 `mcp.run()` 之前用 `jsonschema.validate` 核对所有硬编码样本
+```bash
+# SessionStart:期望 stdout 含 additionalContext 列出 "Yuque Knowledge Link (low)"
+echo '{"event":"SessionStart","session_id":"01","cwd":"'"$PWD"'"}' | tg-hook
+
+# PreToolUse on search_web(混杂变量工具,未 enable):期望 permissionDecision:"deny"
+echo '{"event":"PreToolUse","session_id":"01","tool_name":"search_web","tool_input":{}}' | tg-hook
+```
+
+实测 stdout 与行为记录见 §5.2。方式 B replay **不写审计**,完整审计链走方式 A。
+
+**方式 A · Claude Code CLI**(需 Anthropic API key;完整交互演示)
+
+```bash
+claude --plugin-dir ../../ --mcp-config ./.mcp.json
+```
+
+启动后按 §3 操作三列表逐行演示。链路概览见 [`../QUICKSTART.md §3.2`](../QUICKSTART.md#32--方式-a--claude-code-cli进阶需-anthropic-api-key--联网)。
 
 ---
 
@@ -129,7 +129,20 @@ created_at                         event                       subject          
 {"permissionDecision":"deny","additionalContext":"tool `search_web` is outside the current active_tools scope.\nIf you need web search, run read_skill → enable_skill for a web-search skill first."}
 ```
 
-> **实测记录**(Phase B 填写):<!-- Phase B 填写:实际 stdout 与本节形状差异 -->
+> **实测记录 · `tg-hook` 子进程退化路径(2026-04-21)**:
+>
+> 方式:`cd examples/01-knowledge-link && GOVERNANCE_DATA_DIR=/tmp/tg-demo-01 GOVERNANCE_SKILLS_DIR=$PWD/skills GOVERNANCE_CONFIG_DIR=$PWD/config`,事件通过 `echo '{"event":"<Name>",...}' | tg-hook` 送入。
+>
+> - **`SessionStart`** → `{"additionalContext":"[Tool Governance] Skills:\n  - Yuque Knowledge Link (low): 演示用 · Yuque 风格知识关联:…"}`(1 个低风险技能被注入上下文,对齐 §4 "注入技能目录")
+> - **`PreToolUse` `search_web`**(混杂变量,未 enable)→ `{"hookSpecificOutput":{"permissionDecision":"deny","permissionDecisionReason":"Tool 'search_web' is not in active_tools. Please use read_skill and enable_skill to authorize the required skill first.","additionalContext":"To use this tool, first discover available skills with list_skills, then read_skill to understand the workflow, then enable_skill to authorize."}}`
+> - **`PreToolUse` `yuque_search`**(未 enable)→ 同上形状,仅 `tool_name` 替换
+> - **`governance.db.audit_log`** 新增 2 行 `event_type=tool.call / decision=deny / detail={"error_bucket":"whitelist_violation"}`,与 §5.1 形状一致(仅时间戳为实跑实际值)
+>
+> **差异**:`enable_skill` / `run_skill_action` / `PostToolUse` 与 `refresh_skills` 插曲走 MCP 元工具链(`tg-mcp`),`tg-hook` 单路径无法覆盖;`additionalContext` 当前返回的是 `hook_handler.py` 通用引导文案,与 §5.2 建议的情境化文案有差异 —— 完整 10 行审计序列与针对性文案待 Claude CLI 交付现场补录。
+
+### 5.3 Verify(通用 SQL 见 QUICKSTART §4)
+
+按 [`../QUICKSTART.md §4`](../QUICKSTART.md#4--verify-通用套路) 的 SQL 模板查询 `$GOVERNANCE_DATA_DIR/governance.db`。**方式 A 完整跑完**时,期望看到 §5.1 列出的 10 行审计(`session.start` → `skill.read` → `skill.enable` → `tool.call × N`(allow/deny 交叉)→ `skill.action relate` → `skills.index.refresh`),时间戳严格递增。**只跑方式 B** 时,审计表为空或不存在是预期行为(方式 B 不写审计,见 QUICKSTART §4 注释)。
 
 ---
 
@@ -157,3 +170,25 @@ created_at                         event                       subject          
   - `tests/functional/test_functional_happy_path.py` — happy chain(list → read → enable → run_skill_action → PostToolUse)
   - `tests/functional/test_functional_gating.py` — PreToolUse deny + `whitelist_violation` 审计 + MCP 命名空间 deny
   - `tests/functional/test_functional_refresh.py` — `refresh_skills` 可见性 + 单次 `build_index`
+
+---
+
+## 8. Reset 与本 workspace 专属 troubleshooting
+
+### 8.1 Reset(跑第二次前清理 demo 状态)
+
+```bash
+cd examples/01-knowledge-link/
+rm -rf ./.demo-data
+```
+
+只删本 workspace 的 `.demo-data/`(含 `governance.db`);**不要触碰** `skills/`、`mcp/`、`schemas/`、`contracts/`、`config/`、`.mcp.json` —— 它们是演示资产本身。通用安全口径见 [`../QUICKSTART.md §5`](../QUICKSTART.md#5--reset-通用套路)。
+
+### 8.2 本 workspace 专属 troubleshooting
+
+共性症状(pip 错目录、`tg-hook` 返回 `{}`、`GOVERNANCE_*` 未导出、`.mcp.json` 相对路径断裂等)见 [`../QUICKSTART.md §6`](../QUICKSTART.md#6--troubleshooting8-类常见启动失败)。本 workspace 独有症状如下:
+
+| 症状 | 根因 | 验证 | 修复 |
+|---|---|---|---|
+| §3 附录 `refresh_skills` 调用后,`list_skills` 仍只返回 1 项 | 忘了**手动**把 `skills_incoming/yuque-comment-sync` 拷到 `skills/`;`SkillIndexer` 只扫 `$GOVERNANCE_SKILLS_DIR`,不触 `skills_incoming/` | `ls ./skills/` 是否含 `yuque-comment-sync/SKILL.md` | `cp -r ./skills_incoming/yuque-comment-sync ./skills/`,再调 `refresh_skills()`;两步顺序不能反 |
+| 方式 B replay 中 `PreToolUse` on `yuque_search` 没看到针对语雀的引导文案 | `tg-hook` 在 `skills_loaded` 为空时返回通用引导文案,与 §5.2 建议的情境化文案不同(见 §5.2 末尾"差异"说明) | 对比 §5.2 "实测记录"块与上方期望文案块 | 走方式 A 完整流程即可看到情境化文案;或接受通用文案作为 `error_bucket=whitelist_violation` 的合法 stdout |

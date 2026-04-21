@@ -122,13 +122,13 @@
 - [x] 3.10 Workspace 02 · 新增 reset 段
 - [x] 3.11 Workspace 02 · 新增本 workspace 专属 troubleshooting 段:`stage 未切换导致 yuque_update_doc 被拦` / `run_command 被 blocked_tools 兜底` / `enable 无 reason 被拒` 等 02 独有条目
 - [x] 3.12 Workspace 02 · 核验 grep 不变量;commit(message: `stage C-02: migrate 02-doc-edit-staged README`)
-- [ ] 3.13 Workspace 03 · 骨架重排(同 3.1)
-- [ ] 3.14 Workspace 03 · 清理共性段(同 3.2)
-- [ ] 3.15 Workspace 03 · 新增 verify 段:覆盖 §5.1 期望的 `grant.expire` / `grant.revoke` / `skill.disable`(严格顺序)/ `skill.enable decision=denied reason=approval_required` / `tool.call yuque_delete_doc decision=deny reason=blocked` / `skills.index.refresh` 关键行
-- [ ] 3.16 Workspace 03 · 新增 reset 段
-- [ ] 3.17 Workspace 03 · 新增本 workspace 专属 troubleshooting 段:`TTL 等待超过 120s` / `refresh_skills 附录打点位置` / `两层防线现象分不清` 等 03 独有条目
-- [ ] 3.18 Workspace 03 · §2 追加 fast policy 切换说明占位(单行:"加速现场演示改用 `config/demo_policy.fast.yaml`,详见 Stage D");本 stage 不落文件
-- [ ] 3.19 Workspace 03 · 核验 grep 不变量;commit(message: `stage C-03: migrate 03-lifecycle-and-risk README`)
+- [x] 3.13 Workspace 03 · 骨架重排(同 3.1)
+- [x] 3.14 Workspace 03 · 清理共性段(同 3.2)
+- [x] 3.15 Workspace 03 · 新增 verify 段:覆盖 §5.1 期望的 `grant.expire` / `grant.revoke` / `skill.disable`(严格顺序)/ `skill.enable decision=denied reason=approval_required` / `tool.call yuque_delete_doc decision=deny reason=blocked` / `skills.index.refresh` 关键行
+- [x] 3.16 Workspace 03 · 新增 reset 段
+- [x] 3.17 Workspace 03 · 新增本 workspace 专属 troubleshooting 段:`TTL 等待 / refresh 附录位置` / `两层防线现象分不清` 等 03 独有条目
+- [x] 3.18 Workspace 03 · §2 追加 fast policy 切换说明占位(单行:"加速现场演示改用 `config/demo_policy.fast.yaml`,详见 Stage D");本 stage 不落文件
+- [x] 3.19 Workspace 03 · 核验 grep 不变量;commit(message: `stage C-03: migrate 03-lifecycle-and-risk README`)
 - [ ] 3.20 根 `examples/README.md` §2 顶部追加:"新手先读 [`QUICKSTART.md`](./QUICKSTART.md)" + "可先跑 `bash scripts/check-demo-env.sh` 做环境自检(Stage D 产出,可能降级)"
 - [ ] 3.21 根 `examples/README.md` §5 末尾追加:"更完整的排障矩阵见 QUICKSTART §6";commit(message: `stage C-root: wire examples/README to QUICKSTART`)
 

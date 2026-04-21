@@ -2,6 +2,8 @@
 
 > 本样例展示 tool-gate 在**长会话**中的能力**回收**与**风险升级**机制。主线围绕 TTL / revoke / disable / 高风险审批 / 审计闭环展开;`refresh_skills` 不在主线(其主场景在[样例 01 的附录](../01-knowledge-link/README.md#附录--refresh_skills-插曲)),本样例仅在末尾做一次辅助复核触发。
 
+> ⚠️ **Preflight**:本 workspace **不负责**项目安装。先读 [`../QUICKSTART.md`](../QUICKSTART.md)(§1 概念 + wiring / §2 零知识安装 / §7 preflight 自检),按 §2 在**仓库根**完成一次性安装之后再回来跑本样例。workspace 目录仅负责 demo run。
+
 ---
 
 ## 0. 业务背景与展示目标
@@ -29,16 +31,9 @@
 
 ---
 
-## 2. 演示前置
+## 2. 演示前置与启动
 
-### 2.1 一次性环境准备
-
-```bash
-# 在仓库根执行
-pip install -e ".[dev]"
-```
-
-### 2.2 进入 workspace 启动
+### 2.1 环境变量(两条路径都要导出)
 
 ```bash
 cd examples/03-lifecycle-and-risk/
@@ -46,27 +41,44 @@ cd examples/03-lifecycle-and-risk/
 export GOVERNANCE_DATA_DIR="$PWD/.demo-data"
 export GOVERNANCE_SKILLS_DIR="$PWD/skills"
 export GOVERNANCE_CONFIG_DIR="$PWD/config"
-
-# 方式 A · Claude Code CLI
-claude --plugin-dir ../../ --mcp-config ./.mcp.json
-
-# 方式 B · mock 握手冒烟
-python ./mcp/mock_yuque_stdio.py
 ```
 
-### 2.3 时间推进的替代手段
+三个 env var 的作用与缺失时的症状见 [`../QUICKSTART.md §1.3`](../QUICKSTART.md#13--三个-governance_-环境变量)。
+
+### 2.2 启动(两条路径,方式 B 首推)
+
+**方式 B · 离线子进程 replay**(零 API key,决策 stdout 可见;通用模板见 [`../QUICKSTART.md §3.1`](../QUICKSTART.md#31--方式-b--子进程-replayoffline--免-api-key))
+
+```bash
+# SessionStart:期望 stdout 列出 3 个技能
+# (Yuque Knowledge Link low / Yuque Doc Edit medium / Yuque Bulk Delete high)
+echo '{"event":"SessionStart","session_id":"03","cwd":"'"$PWD"'"}' | tg-hook
+
+# PreToolUse on yuque_delete_doc(全局 blocked_tools 兜底):期望 permissionDecision:"deny"
+echo '{"event":"PreToolUse","session_id":"03","tool_name":"yuque_delete_doc","tool_input":{}}' | tg-hook
+
+# PreToolUse on yuque_search(yuque-knowledge-link 未 enable):期望 permissionDecision:"deny"
+echo '{"event":"PreToolUse","session_id":"03","tool_name":"yuque_search","tool_input":{}}' | tg-hook
+```
+
+实测 stdout 见 §5.2。方式 B replay **不写审计**,完整生命周期链(TTL 到期 / `grant.revoke` / `skill.disable` / `approval_required`)走方式 A。
+
+**方式 A · Claude Code CLI**(需 Anthropic API key;完整交互演示)
+
+```bash
+claude --plugin-dir ../../ --mcp-config ./.mcp.json
+```
+
+启动后按 §3 操作三列表逐行演示。链路概览见 [`../QUICKSTART.md §3.2`](../QUICKSTART.md#32--方式-a--claude-code-cli进阶需-anthropic-api-key--联网)。
+
+### 2.3 时间推进(TTL 加速)
 
 实际演示不等 120 秒 TTL 过期太慢。两种加速方案任选其一:
-- **方案 A**:临时把 `config/demo_policy.yaml` 的 `max_ttl: 5`,配合手动 sleep 6
-- **方案 B**:用 `tg-mcp` 的 `grant_status` 手动读 TTL 剩余;到期前后各发一次 `UserPromptSubmit` 事件,观察 `active_tools` 差异
 
-两种方案都在 §5 预期审计中预留了 `grant.expire` 行。
+- **方案 A(推荐,文件切换)**:使用 Stage D 提供的 `config/demo_policy.fast.yaml`(`max_ttl: 5`),临时把启动命令的 `GOVERNANCE_CONFIG_DIR` 指到它,或在 `config/demo_policy.yaml` 上做软链 —— 文件由 Stage D 落地,届时本段会补齐具体切换命令
+- **方案 B(现场 inline diff)**:临时把 `config/demo_policy.yaml` 的 `max_ttl` 从 120 改成 5,配合手动 `sleep 6` 等待过期;演示后 `git checkout -- config/demo_policy.yaml` 回滚
 
-### 2.4 Phase B 已交付
-
-- ✅ `mcp/mock_yuque_stdio.py`:yuque_search / yuque_list_docs / yuque_get_doc / yuque_update_doc / yuque_delete_doc
-- ✅ `yuque_delete_doc` 在 `blocked_tools` 中,handler 实际不可达;保留仅为让 list_tools 能真实出现该工具供两层防线演示
-- ✅ 启动自检通过 `jsonschema.validate`
+两种方案都在 §5.1 预期审计中预留了 `grant.expire` 行。Stage D 落地 `demo_policy.fast.yaml` 前,建议用方案 B。
 
 ---
 
@@ -138,7 +150,20 @@ created_at                         event                     subject            
 "tool `yuque_delete_doc` is in global blocked_tools and cannot be invoked regardless of skill grants."
 ```
 
-> **实测记录**(Phase B 填写):<!-- Phase B 填写:实际 stdout 与本节形状差异 -->
+> **实测记录 · `tg-hook` 子进程退化路径(2026-04-21)**:
+>
+> 方式:`cd examples/03-lifecycle-and-risk && GOVERNANCE_DATA_DIR=/tmp/tg-demo-03 GOVERNANCE_SKILLS_DIR=$PWD/skills GOVERNANCE_CONFIG_DIR=$PWD/config`,事件通过 `echo '{"event":"<Name>",...}' | tg-hook` 送入。
+>
+> - **`SessionStart`** → `additionalContext` 列出 3 个技能:`Yuque Bulk Delete (high)` / `Yuque Doc Edit (medium)` / `Yuque Knowledge Link (low)`,`SkillIndexer` 对高风险技能仍发现并索引(符合 §4 "高风险技能进索引但 enable 时被 `approval_required` 拦"的前提)
+> - **`PreToolUse` `yuque_delete_doc`**(`blocked_tools` 列表项 + 未 enable)→ `{"permissionDecision":"deny", …}`
+> - **`PreToolUse` `yuque_search`**(`yuque-knowledge-link` 未 enable)→ 同上形状
+> - **`governance.db.audit_log`** 新增 2 行 `tool.call / deny / error_bucket=whitelist_violation`
+>
+> **差异**:`grant.expire` / `grant.revoke` / `skill.disable` / `approval_required` / `blocked` bucket 依赖 TTL 到期 + `disable_skill` + `enable_skill` 元工具链,子进程退化仅覆盖 `whitelist_violation` 一类;§5.1 剩余生命周期 / 高风险 deny 审计行与 §5.2 上方针对性文案待 Claude CLI 交付现场补录。
+
+### 5.3 Verify(通用 SQL 见 QUICKSTART §4)
+
+按 [`../QUICKSTART.md §4`](../QUICKSTART.md#4--verify-通用套路) 的 SQL 模板查询 `$GOVERNANCE_DATA_DIR/governance.db`。**方式 A 完整跑完**时,期望看到 §5.1 列出的 11 行审计 —— 本样例的**强顺序不变量**:(a)`grant.expire yuque-knowledge-link reason=ttl` 至少 2 次(早晨一次 + 下午 ~90s 后再一次);(b)`grant.revoke yuque-doc-edit` 紧接 `skill.disable yuque-doc-edit`,`created_at` 严格 `revoke < disable`(D7 不变量);(c)`skill.enable yuque-bulk-delete decision=denied reason=approval_required` 必须出现;(d)`tool.call yuque_delete_doc decision=deny reason=blocked`(注意 `reason=blocked` 非 `whitelist_violation`,体现"两层防线"第二层)。**只跑方式 B** 时审计表为空或不存在是预期。
 
 ---
 
@@ -166,3 +191,29 @@ created_at                         event                     subject            
   - `tests/functional/test_functional_revoke.py` — `disable_skill` 审计顺序(D7)
   - `tests/functional/test_functional_policy_e2e_lifecycle.py::E7/E8/E9` — 策略下的 TTL / stage / revoke 闭环
   - `tests/functional/test_functional_refresh.py` — `refresh_skills` 单次 `build_index`(仅附录用)
+
+---
+
+## 8. Reset 与本 workspace 专属 troubleshooting
+
+### 8.1 Reset(跑第二次前清理 demo 状态)
+
+```bash
+cd examples/03-lifecycle-and-risk/
+rm -rf ./.demo-data
+```
+
+只删本 workspace 的 `.demo-data/`(含 `governance.db`);**不要触碰** `skills/`、`mcp/`、`schemas/`、`contracts/`、`config/`、`.mcp.json` —— 它们是演示资产本身。通用安全口径见 [`../QUICKSTART.md §5`](../QUICKSTART.md#5--reset-通用套路)。
+
+> 本样例特别提示:如果跑过方案 B 的 inline TTL 改动又忘了回滚,Reset 时也要一并 `git checkout -- config/demo_policy.yaml`。
+
+### 8.2 本 workspace 专属 troubleshooting
+
+共性症状(pip 错目录、`tg-hook` 返回 `{}`、`GOVERNANCE_*` 未导出、`.mcp.json` 相对路径断裂等)见 [`../QUICKSTART.md §6`](../QUICKSTART.md#6--troubleshooting8-类常见启动失败)。本 workspace 独有症状如下:
+
+| 症状 | 根因 | 验证 | 修复 |
+|---|---|---|---|
+| §3 14:00:00+08:00 那一行期望 `grant.expire yuque-knowledge-link` 已经发生,实际 `grant_status` 仍显示 `yuque-knowledge-link` 未过期 | 现场演示没跑足够长的时间窗口 —— `max_ttl=120` 默认值下必须等 120s;或时间推进方案未生效 | `grant_status()` 返回的 `ttl_remaining` 是否 `> 0` | 按 §2.3 方案 A 切 `demo_policy.fast.yaml`(Stage D 落地后)或方案 B 手工改 `max_ttl: 5` 并 `sleep 6` |
+| `disable_skill("yuque-doc-edit")` 后审计表里 `skill.disable` 行在 `grant.revoke` **之前**出现 | D7 顺序违规,代表实现端问题(不应在 demo 路径发生) | `SELECT created_at, event, skill_id FROM audit WHERE event IN ('grant.revoke','skill.disable') AND skill_id='yuque-doc-edit' ORDER BY created_at;` | 这是实现回归,**不属于 demo 使用问题**;归档前请反馈给 `add-delivery-demo-workspaces` 或核心维护 |
+| `yuque_delete_doc` 被 deny,看到原因 `whitelist_violation` 而非 `blocked` | 演示者没走"假设路径强启用 bulk-delete"那一步;未 enable 时 deny 归 `whitelist_violation` 是正常;`blocked` 只有在 `yuque-bulk-delete` 已 enable 的情况下才会被兜底拦 | §5.1 最后一行 `tool.call yuque_delete_doc decision=deny reason=blocked` 需要走管理员通道假设启用,才是两层防线第二层展示 | 按 §3 14:00:50 行的**假设路径**注释:即便跳过 `approval_required` 把 skill 强启用,`blocked_tools` 仍兜底拦;若仅演示第一层,止步于 `approval_required` deny 即可 |
+| `refresh_skills` 附录(§3 附录 14:05:03)被当成主线,读者以为是 01 的 refresh 情节 | 03 主线**不包含** `refresh_skills`;附录仅为让功能矩阵的"03 列 refresh_skills=●"有实际打点;主场景在 [01 的附录](../01-knowledge-link/README.md#附录--refresh_skills-插曲) | 看 §0 开头粗体提示,以及附录的引言 | 直接跳过附录;主线验收只看 §3 主表 |

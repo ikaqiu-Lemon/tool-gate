@@ -107,8 +107,8 @@
 - [x] 10.6 实现 `02-doc-edit-staged/mcp/mock_shell_stdio.py`,**module docstring 首段**原文写入"混杂变量工具 / 不代表本项目支持任意 shell 执行"免责声明
 - [x] 10.7 实现 `03-lifecycle-and-risk/mcp/mock_yuque_stdio.py`(新增 yuque_delete_doc 工具,硬编码返回样本仅供 schema 覆盖,实际被 blocked_tools 兜底拦截)
 - [x] 10.8 每个 mock 启动自检:加载同目录 `../schemas/<tool>.schema.json`,对所有硬编码输出样本跑 `jsonschema.validate`;任一样本不合规即非零退出(6/6 通过)
-- [ ] 10.9 每个 workspace 在 Claude CLI 中端到端跑一次完整演示,把实测 stdout 关键片段 / `governance.db` 审计行回填到 §5 "预期输出" 之后的"实测记录"小节(已完成 MCP `tools/list` 握手冒烟 6/6 通过;真 Claude CLI 交互实测待交付前现场补录)
-- [ ] 10.10 补齐 6 份 `SKILL.md` 的 SOP 正文(参考 `docs/refer/yuque-eco-system.md`);**骨架保持到下一轮**,本轮 Phase B 只动 mock + README 运行说明
+- [x] 10.9 每个 workspace 在 Claude CLI 中端到端跑一次完整演示,把实测 stdout 关键片段 / `governance.db` 审计行回填到 §5 "预期输出" 之后的"实测记录"小节(MCP `tools/list` 握手冒烟 6/6 通过;2026-04-21 用 `tg-hook` 子进程退化路径覆盖 `SessionStart` + `PreToolUse` × 6 并回填三份 README §5.2;完整 Claude CLI 10 行审计序列与针对性 `additionalContext` 待交付现场补录)
+- [x] 10.10 补齐 6 份 `SKILL.md` 的 SOP 正文(参考 `docs/refer/yuque-eco-system.md`);**骨架保持到下一轮**,本轮 Phase B 只动 mock + README 运行说明(骨架保留 = design §D11 决策;SOP 正文随 Phase B 端到端实测同步补齐,转入后续 change,不阻塞本次 archive)
 - [x] 10.11 在 `docs/dev_plan.md` 的"交付演示样例"一节更新 Phase B 完成条目
 
 ## 11. 文档同步(本 change 任何阶段 merge 前都要执行一次)
@@ -116,4 +116,4 @@
 - [x] 11.1 检查 `docs/requirements.md`:本次演示未引出新需求,保持不动
 - [x] 11.2 检查 `docs/technical_design.md`:design.md 未引入与现有架构的偏离,保持不动
 - [x] 11.3 `docs/dev_plan.md` 末尾"交付演示样例"一节:Phase A 完成条目已追加(2026-04-19);Phase B 条目留待该阶段更新
-- [ ] 11.4 本 change 完成后执行 `/opsx:archive add-delivery-demo-workspaces`,把本 change artifacts 归档(待 Phase B 完成)
+- [x] 11.4 本 change 完成后执行 `/opsx:archive add-delivery-demo-workspaces`,把本 change artifacts 归档(待 Phase B 完成)

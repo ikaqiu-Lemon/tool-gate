@@ -70,11 +70,11 @@
 
 **上下文守则**:只读 `docs/` 三份 md;事实从本 change 的 design / specs 取。
 
-- [ ] E.1 运行 `pytest -q` 全量，记录 passed 数量
-- [ ] E.2 运行 `openspec validate migrate-entrypoints-to-runtime-flow` 通过
-- [ ] E.3 `docs/technical_design.md` · 更新 "Runtime vs Persisted State" 小节
-- [ ] E.4 `docs/dev_plan.md` · 追加本 change 的 Stage A-E 条目
-- [ ] E.5 产出 `closeout.md`:迁移清单、测试覆盖、DeprecationWarning 触发条件、后续 backlog(若有)
-- [ ] E.6 确认本 change **未**修改 `docs/requirements.md`
-- [ ] E.7 对照 proposal §"In Scope" 与 specs/ Requirement 做自查
-- [ ] E.8 产出 · 运行结果汇总表(full pytest、openspec validate、各 Stage commit hash)
+- [x] E.1 运行 `pytest -q` 全量，记录 passed 数量 — 238 passed
+- [x] E.2 运行 `openspec validate migrate-entrypoints-to-runtime-flow` 通过 — ✅
+- [x] E.3 `docs/technical_design.md` · 更新 "Runtime vs Persisted State" 小节
+- [x] E.4 `docs/dev_plan.md` · 追加本 change 的 Stage A-E 条目
+- [x] E.5 产出 `closeout.md`:迁移清单、测试覆盖、DeprecationWarning 触发条件、后续 backlog(若有)
+- [x] E.6 确认本 change **未**修改 `docs/requirements.md` — ✅ 未修改
+- [x] E.7 对照 proposal §"In Scope" 与 specs/ Requirement 做自查 — ✅ 所有验收标准满足
+- [x] E.8 产出 · 运行结果汇总表(full pytest、openspec validate、各 Stage commit hash) — 见 closeout.md

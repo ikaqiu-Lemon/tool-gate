@@ -74,6 +74,9 @@ class TestE7ChangeStageUnderPolicy:
             assert enable["granted"] is True
 
             state = rt.state_manager.load_or_init(session_id)
+            # Stage C3 excluded ``active_tools`` from the persisted
+            # payload; recompute before asserting tool membership.
+            rt.tool_rewriter.recompute_active_tools(state, rt.indexer)
             assert "mock_read" in state.active_tools
             assert "mock_write" not in state.active_tools
 
@@ -113,13 +116,14 @@ class TestE8TTLExpiryUnderPolicy:
             hook_handler.handle_session_start(events.session_start(session_id))
 
             state = rt.state_manager.load_or_init(session_id)
-            meta = state.skills_metadata["mock_readonly"]
+            # Stage D: read from indexer instead of persisted state.
+            meta = rt.indexer.current_index()["mock_readonly"]
             grant = rt.grant_manager.create_grant(
                 session_id, "mock_readonly", meta.allowed_ops, ttl=0
             )
             rt.state_manager.add_to_skills_loaded(state, "mock_readonly")
             state.active_grants["mock_readonly"] = grant
-            rt.tool_rewriter.recompute_active_tools(state)
+            rt.tool_rewriter.recompute_active_tools(state, rt.indexer)
             rt.state_manager.save(state)
 
             time.sleep(0.1)

@@ -82,6 +82,9 @@ class TestE1LowRiskAutoAllowFullChain:
             )
             assert "mock_read" in ups["additionalContext"]
             state = rt.state_manager.load_or_init(session_id)
+            # Stage C3 excluded ``active_tools`` from the persisted
+            # payload; recompute before asserting the tool union.
+            rt.tool_rewriter.recompute_active_tools(state, rt.indexer)
             assert {"mock_read", "mock_glob"}.issubset(state.active_tools)
 
             act = asyncio.run(

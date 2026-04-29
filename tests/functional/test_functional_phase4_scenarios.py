@@ -59,6 +59,10 @@ class TestMultiSkillConcurrentEnable:
             skill_ids = {g.skill_id for g in grants}
             assert {"mock_readonly", "mock_ttl"} <= skill_ids
 
+            # Stage C3 excluded ``active_tools`` from the persisted
+            # payload; recompute the in-memory derivation before the
+            # set-union assertion.
+            rt.tool_rewriter.recompute_active_tools(state, rt.indexer)
             assert {"mock_read", "mock_glob", "mock_ping"} <= set(
                 state.active_tools
             )
@@ -78,6 +82,9 @@ class TestMultiSkillConcurrentEnable:
             assert "mock_readonly" not in state.skills_loaded
             assert "mock_ttl" in state.skills_loaded
 
+            # Stage C3 excluded ``active_tools`` from the persisted
+            # payload; recompute before inspecting the tool set.
+            rt.tool_rewriter.recompute_active_tools(state, rt.indexer)
             tools = set(state.active_tools)
             assert "mock_ping" in tools
             assert "mock_read" not in tools

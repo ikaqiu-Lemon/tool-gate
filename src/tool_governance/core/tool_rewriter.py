@@ -3,12 +3,25 @@
 The rewriter is the single authority on which MCP tools are visible
 in a given turn.  Every enable/disable/stage-change funnels through
 ``recompute_active_tools`` to rebuild the set.
+
+Stage C of ``separate-runtime-and-persisted-state`` adds a parallel
+runtime-view-driven entry point, :func:`compute_active_tools`, which
+is the migration target for callers that have switched to consuming
+the pre-built ``RuntimeContext``.  The legacy
+``ToolRewriter.recompute_active_tools`` remains unchanged for MCP
+meta-tools and other callers that still thread ``SessionState``
+through.
 """
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from tool_governance.models.skill import SkillMetadata
 from tool_governance.models.state import SessionState
+
+if TYPE_CHECKING:
+    from tool_governance.core.runtime_context import RuntimeContext
 
 # Meta-tools are always visible regardless of skills_loaded.
 # They form the "bootstrap" set that lets the model discover and
@@ -33,15 +46,40 @@ class ToolRewriter:
     def __init__(self, blocked_tools: list[str] | None = None) -> None:
         self._blocked: set[str] = set(blocked_tools or [])
 
-    def recompute_active_tools(self, state: SessionState) -> list[str]:
-        """Full recomputation: meta_tools ∪ stage_tools(loaded) − blocked.
+    @property
+    def blocked_tools(self) -> frozenset[str]:
+        """Immutable view of the global deny-list.
 
-        Updates ``state.active_tools`` **in place** and returns the list.
+        Added in Stage B of ``separate-runtime-and-persisted-state``
+        so that external callers (``build_runtime_context``) can read
+        the blocked set without reaching into the private attribute.
+        """
+        return frozenset(self._blocked)
+
+    def recompute_active_tools(
+        self,
+        state: SessionState,
+        indexer: "SkillIndexer | None" = None,
+    ) -> list[str]:
+        """DEPRECATED: Use compute_active_tools(RuntimeContext) instead.
+
+        This function is a thin adapter for backward compatibility.
+        It will be removed in a future version.
+
+        Builds a minimal RuntimeContext from the current state and calls
+        compute_active_tools(). Updates state.active_tools in place for
+        backward compatibility.
+
+        Args:
+            state: The session state to recompute tools for.
+            indexer: Optional SkillIndexer to read metadata from. If not
+                provided, falls back to state.skills_metadata (which will
+                be empty after Stage D if state was loaded from disk).
 
         Contract:
             Preconditions:
                 - Every skill_id in ``state.skills_loaded`` should have
-                  a matching entry in ``state.skills_metadata``.  If a
+                  a matching entry in the metadata source.  If a
                   loaded skill has no metadata, it is silently skipped
                   and contributes zero tools — the model loses access
                   to that skill's tools with no error raised.
@@ -52,20 +90,29 @@ class ToolRewriter:
                   set; the caller cannot tell whether any tools were
                   stripped by the deny-list.
         """
-        tools: set[str] = set(META_TOOLS)
+        import warnings
+        warnings.warn(
+            "recompute_active_tools(state) is deprecated. "
+            "Use compute_active_tools(RuntimeContext) instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
 
-        for skill_id, loaded_info in state.skills_loaded.items():
-            meta = state.skills_metadata.get(skill_id)
-            if meta is None:
-                # Loaded skill with no metadata — skip silently.
-                continue
-            stage_tools = self.get_stage_tools(meta, loaded_info.current_stage)
-            tools.update(stage_tools)
+        # Stage D: skills_metadata is no longer persisted, so after
+        # loading from disk it will be empty. Prefer indexer if provided.
+        metadata = indexer.current_index() if indexer else state.skills_metadata
 
-        # Apply global deny-list last so it always wins.
-        tools -= self._blocked
-        state.active_tools = sorted(tools)
-        return state.active_tools
+        # Build minimal RuntimeContext for compatibility
+        from tool_governance.core.runtime_context import build_runtime_context
+        ctx = build_runtime_context(
+            state,
+            metadata=metadata,
+            blocked_tools=self._blocked,
+        )
+        active_tools = compute_active_tools(ctx)
+        # In-place mutation for backward compatibility
+        state.active_tools = active_tools
+        return active_tools
 
     @staticmethod
     def get_stage_tools(skill_meta: SkillMetadata, current_stage: str | None) -> list[str]:
@@ -100,3 +147,21 @@ class ToolRewriter:
 
         # Stage name mismatch — return nothing rather than guessing.
         return []
+
+
+def compute_active_tools(ctx: "RuntimeContext") -> list[str]:
+    """Return the runtime view's active tool list.
+
+    Stage C migration target for ``separate-runtime-and-persisted-state``.
+    Callers that used to invoke ``ToolRewriter.recompute_active_tools(state)``
+    and then read ``state.active_tools`` should instead build a
+    ``RuntimeContext`` once per turn and pass it here — the result is
+    the same list, without the side effect of mutating
+    ``SessionState.active_tools``.
+
+    The function is a thin passthrough on purpose: the derivation
+    formula (meta ∪ stage_tools − blocked) lives exclusively in
+    ``runtime_context.build_runtime_context`` so there is a single
+    source of truth for "what the model sees this turn".
+    """
+    return list(ctx.active_tools)

@@ -16,8 +16,13 @@ from datetime import datetime
 from typing import Any
 
 from tool_governance.bootstrap import create_governance_runtime, GovernanceRuntime
+from tool_governance.core.runtime_context import (
+    RuntimeContext,
+    build_runtime_context,
+)
 from tool_governance.core.state_manager import discover_session_id
 from tool_governance.core.tool_rewriter import META_TOOLS
+from tool_governance.models.state import SessionState
 
 # Lazy singleton — initialised on first call to _get_runtime().
 _runtime: GovernanceRuntime | None = None
@@ -69,6 +74,34 @@ def _extract_tool_short_name(tool_name: str) -> str:
     return parts[-1] if len(parts) >= 3 else tool_name
 
 
+def _build_runtime_ctx(rt: GovernanceRuntime, state: SessionState) -> RuntimeContext:
+    """Build the per-turn ``RuntimeContext`` for a hook invocation.
+
+    Introduced in Stage B of ``separate-runtime-and-persisted-state``
+    so that derived-field reads within the hook layer (deny-bucket
+    classification, post-tool-use skill lookup) flow through the
+    runtime view instead of ``SessionState`` directly.
+
+    Metadata preference order:
+        1. ``rt.indexer.current_index()`` — authoritative since the
+           cache-layer formalization.
+        2. ``state.skills_metadata`` — legacy session snapshot, kept
+           as a fallback so a cold start (empty indexer) still yields
+           a usable context.  Stage C will drop this fallback once
+           every writer populates the indexer.
+
+    The function is a thin wrapper: callers can build a context by
+    hand (see the unit tests) when they need to inject a specific
+    metadata map or clock.
+    """
+    metadata = rt.indexer.current_index() or state.skills_metadata
+    return build_runtime_context(
+        state,
+        metadata=metadata,
+        blocked_tools=rt.tool_rewriter.blocked_tools,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Hook handlers
 # ---------------------------------------------------------------------------
@@ -76,10 +109,18 @@ def _extract_tool_short_name(tool_name: str) -> str:
 def handle_session_start(input_data: dict[str, Any]) -> dict[str, Any]:
     """SessionStart: init state, cleanup grants, build index, inject catalog.
 
-    Called once when a new Claude session begins.  Performs first-time
-    setup: loads or creates the session state, expires stale grants,
-    populates the skill index (if the state was fresh), recomputes
-    the active tool set, and returns a catalog for the model's context.
+    Called once when a new Claude session begins.  Stage C lifecycle
+    for ``separate-runtime-and-persisted-state``:
+
+        1. Load persisted state (+ reconcile: cleanup expired grants,
+           populate skill index if empty — both are durable
+           mutations applied directly to ``SessionState``).
+        2. Derive the per-turn ``RuntimeContext`` from the reconciled
+           state, the live skill index, and the current policy.
+        3. Let rewrite (``active_tools``) and prompt composition both
+           consume the runtime view.  Mirror ``active_tools`` onto
+           the persisted snapshot for unmigrated readers.
+        4. Persist durable fields.
 
     Contract:
         Raises:
@@ -94,31 +135,37 @@ def handle_session_start(input_data: dict[str, Any]) -> dict[str, Any]:
     """
     rt = _get_runtime()
     session_id = discover_session_id(input_data)
-    state = rt.state_manager.load_or_init(session_id)
 
-    # Cleanup expired grants and unload the corresponding skills.
+    # 1. Load persisted (+ reconcile).
+    state = rt.state_manager.load_or_init(session_id)
     expired = rt.grant_manager.cleanup_expired(session_id)
     for skill_id in expired:
         rt.state_manager.remove_from_skills_loaded(state, skill_id)
-        rt.store.append_audit(session_id, "grant.expire", skill_id=skill_id, decision="expired")
-
-    # Populate index on first session (empty metadata means fresh state).
+        rt.store.append_audit(
+            session_id, "grant.expire", skill_id=skill_id, decision="expired"
+        )
     if not state.skills_metadata:
         state.skills_metadata = rt.indexer.build_index()
 
-    rt.tool_rewriter.recompute_active_tools(state)
+    # 2. Derive runtime view.
+    ctx = _build_runtime_ctx(rt, state)
+
+    # 3. Rewrite / compose consume the runtime view.
+    state.sync_from_runtime(ctx.active_tools)
+    additional_context = rt.prompt_composer.compose_skill_catalog(ctx)
+
+    # 4. Persist durable fields.
     rt.state_manager.save(state)
 
-    context = rt.prompt_composer.compose_skill_catalog(state)
-    return {"additionalContext": context}
+    return {"additionalContext": additional_context}
 
 
 def handle_user_prompt_submit(input_data: dict[str, Any]) -> dict[str, Any]:
     """UserPromptSubmit: per-turn cleanup, recompute, inject context.
 
-    Called before every user message is processed.  Repeats the
-    grant-expiry sweep and tool recomputation, then injects the
-    full context (catalog + active tools summary).
+    Called before every user message is processed.  Follows the same
+    Stage C lifecycle as ``handle_session_start``: load (+ reconcile)
+    → derive → rewrite/compose on the runtime view → persist.
 
     Contract:
         Raises:
@@ -126,25 +173,36 @@ def handle_user_prompt_submit(input_data: dict[str, Any]) -> dict[str, Any]:
     """
     rt = _get_runtime()
     session_id = discover_session_id(input_data)
-    state = rt.state_manager.load_or_init(session_id)
 
+    # 1. Load persisted (+ reconcile).
+    state = rt.state_manager.load_or_init(session_id)
     expired = rt.grant_manager.cleanup_expired(session_id)
     for skill_id in expired:
         rt.state_manager.remove_from_skills_loaded(state, skill_id)
-        rt.store.append_audit(session_id, "grant.expire", skill_id=skill_id, decision="expired")
+        rt.store.append_audit(
+            session_id, "grant.expire", skill_id=skill_id, decision="expired"
+        )
 
-    # Full recompute — not incremental — so the tool set is always
-    # consistent with the current loaded-skills snapshot.
-    rt.tool_rewriter.recompute_active_tools(state)
+    # 2. Derive runtime view.
+    ctx = _build_runtime_ctx(rt, state)
 
-    context = rt.prompt_composer.compose_context(state)
+    # 3. Rewrite / compose consume the runtime view.
+    state.sync_from_runtime(ctx.active_tools)
+    additional_context = rt.prompt_composer.compose_context(ctx)
+
+    # 4. Persist durable fields.
     rt.state_manager.save(state)
 
-    rt.store.append_audit(session_id, "prompt.submit",
-                          detail={"active_skills": list(state.skills_loaded.keys()),
-                                  "active_tools_count": len(state.active_tools)})
+    rt.store.append_audit(
+        session_id,
+        "prompt.submit",
+        detail={
+            "active_skills": list(state.skills_loaded.keys()),
+            "active_tools_count": len(ctx.active_tools),
+        },
+    )
 
-    return {"additionalContext": context}
+    return {"additionalContext": additional_context}
 
 
 def _is_error_response(tool_response: Any) -> bool:
@@ -162,7 +220,7 @@ def _is_error_response(tool_response: Any) -> bool:
     return bool(err) and err != ""
 
 
-def _classify_deny_bucket(tool_name: str, state: Any) -> str:
+def _classify_deny_bucket(tool_name: str, runtime_ctx: RuntimeContext) -> str:
     """Return the ``error_bucket`` for a PreToolUse deny decision.
 
     Matches the spec's two gate-time buckets:
@@ -179,24 +237,26 @@ def _classify_deny_bucket(tool_name: str, state: Any) -> str:
     The third bucket (``parameter_error``) is not gate-detectable; it is
     classified in :func:`handle_post_tool_use` when the tool response
     carries an error signal.
+
+    Stage B of ``separate-runtime-and-persisted-state`` switched this
+    helper from consuming ``SessionState`` directly to consuming the
+    per-turn ``RuntimeContext`` — the runtime view is the authoritative
+    input for this classification, not the persisted snapshot.
     """
-    if not state.skills_loaded:
+    enabled_ids = runtime_ctx.enabled_skill_ids()
+
+    if not enabled_ids:
         return "whitelist_violation"
 
-    enabled_skill_ids = set(state.skills_loaded.keys())
-
-    for skill_id in enabled_skill_ids:
-        meta = state.skills_metadata.get(skill_id)
-        if not meta:
-            continue
-        if tool_name in meta.allowed_tools:
+    for sv in runtime_ctx.enabled_skills:
+        if tool_name in sv.metadata.allowed_tools:
             return "whitelist_violation"
-        for stage in meta.stages or []:
+        for stage in sv.metadata.stages or []:
             if tool_name in stage.allowed_tools:
                 return "whitelist_violation"
 
-    for skill_id, meta in state.skills_metadata.items():
-        if not meta or skill_id in enabled_skill_ids:
+    for skill_id, meta in runtime_ctx.all_skills_metadata.items():
+        if not meta or skill_id in enabled_ids:
             continue
         if tool_name in meta.allowed_tools:
             return "wrong_skill_tool"
@@ -208,12 +268,18 @@ def _classify_deny_bucket(tool_name: str, state: Any) -> str:
 
 
 def handle_pre_tool_use(input_data: dict[str, Any]) -> dict[str, Any]:
-    """PreToolUse: gate-check a tool against active_tools.
+    """PreToolUse: gate-check a tool against the runtime view's active tools.
 
     Meta-tools (list_skills, enable_skill, etc.) are always allowed
-    without a state lookup.  All other tools must appear in the
-    session's ``active_tools`` list; if not, the call is denied with
-    a guidance message telling the model how to enable skills.
+    without a state lookup.  For every other tool call, the Stage C
+    lifecycle is:
+
+        1. Load persisted state.
+        2. Derive the per-turn ``RuntimeContext``.
+        3. Execute: check ``ctx.active_tools_set()``; allow or deny
+           and record the audit event.
+
+    No persistence step is needed — gate check is read-only on state.
 
     Contract:
         Silences:
@@ -238,10 +304,17 @@ def handle_pre_tool_use(input_data: dict[str, Any]) -> dict[str, Any]:
             }
         }
 
+    # 1. Load persisted.
     state = rt.state_manager.load_or_init(session_id)
 
-    if rt.policy_engine.is_tool_allowed(tool_name, state):
-        rt.store.append_audit(session_id, "tool.call", tool_name=tool_name, decision="allow")
+    # 2. Derive runtime view.
+    ctx = _build_runtime_ctx(rt, state)
+
+    # 3. Execute: gate check off the runtime view.
+    if tool_name in ctx.active_tools_set():
+        rt.store.append_audit(
+            session_id, "tool.call", tool_name=tool_name, decision="allow"
+        )
         return {
             "hookSpecificOutput": {
                 "hookEventName": "PreToolUse",
@@ -249,9 +322,14 @@ def handle_pre_tool_use(input_data: dict[str, Any]) -> dict[str, Any]:
             }
         }
 
-    bucket = _classify_deny_bucket(tool_name, state)
-    rt.store.append_audit(session_id, "tool.call", tool_name=tool_name, decision="deny",
-                          detail={"error_bucket": bucket})
+    bucket = _classify_deny_bucket(tool_name, ctx)
+    rt.store.append_audit(
+        session_id,
+        "tool.call",
+        tool_name=tool_name,
+        decision="deny",
+        detail={"error_bucket": bucket},
+    )
     return {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
@@ -271,11 +349,16 @@ def handle_pre_tool_use(input_data: dict[str, Any]) -> dict[str, Any]:
 def handle_post_tool_use(input_data: dict[str, Any]) -> dict[str, Any]:
     """PostToolUse: update last_used_at, record audit log.
 
-    Scans loaded skills to find which one owns the tool that was
-    just used, then stamps ``last_used_at`` on the corresponding
-    ``LoadedSkillInfo``.  Exactly one skill is stamped per event —
-    the first match wins, top-level ``allowed_tools`` taking
-    precedence over stage-level.
+    Stage C lifecycle:
+        1. Load persisted state.
+        2. Derive the per-turn ``RuntimeContext``.
+        3. Execute: find the skill that owns ``tool_name`` via the
+           runtime view, then stamp ``last_used_at`` onto the
+           persisted ``LoadedSkillInfo`` — the durable field.
+        4. Persist durable fields.
+
+    Exactly one skill is stamped per event — the first match wins,
+    top-level ``allowed_tools`` taking precedence over stage-level.
 
     Contract:
         Silences:
@@ -289,37 +372,46 @@ def handle_post_tool_use(input_data: dict[str, Any]) -> dict[str, Any]:
     session_id = discover_session_id(input_data)
     tool_name = input_data.get("tool_name", "")
 
+    # 1. Load persisted.
     state = rt.state_manager.load_or_init(session_id)
 
-    # Find which skill owns this tool and stamp last_used_at on
-    # exactly one skill (top-level match beats stage-level; first
-    # skill iterated wins).  A later skill with the same tool must
-    # not overwrite the timestamp.
+    # 2. Derive runtime view.
+    ctx = _build_runtime_ctx(rt, state)
+
+    # 3. Execute: lookup via runtime view, mutate the persisted
+    # ``skills_loaded`` dict with the durable ``last_used_at`` stamp.
     matched = False
-    for skill_id, loaded in state.skills_loaded.items():
-        meta = state.skills_metadata.get(skill_id)
-        if not meta:
-            continue
+    for sv in ctx.enabled_skills:
+        meta = sv.metadata
         if tool_name in meta.allowed_tools:
-            loaded.last_used_at = datetime.utcnow()
+            state.skills_loaded[sv.skill_id].last_used_at = datetime.utcnow()
             matched = True
             break
         if meta.stages:
             for stage in meta.stages:
                 if tool_name in stage.allowed_tools:
-                    loaded.last_used_at = datetime.utcnow()
+                    state.skills_loaded[sv.skill_id].last_used_at = datetime.utcnow()
                     matched = True
                     break
             if matched:
                 break
 
+    # 4. Persist durable fields.
     rt.state_manager.save(state)
+
     tool_response = input_data.get("tool_response")
     if _is_error_response(tool_response):
-        rt.store.append_audit(session_id, "tool.call", tool_name=tool_name, decision="error",
-                              detail={"error_bucket": "parameter_error"})
+        rt.store.append_audit(
+            session_id,
+            "tool.call",
+            tool_name=tool_name,
+            decision="error",
+            detail={"error_bucket": "parameter_error"},
+        )
     else:
-        rt.store.append_audit(session_id, "tool.call", tool_name=tool_name, decision="allow")
+        rt.store.append_audit(
+            session_id, "tool.call", tool_name=tool_name, decision="allow"
+        )
     return {}
 
 

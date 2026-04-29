@@ -14,7 +14,9 @@ from typing import Any, Literal
 from mcp.server.fastmcp import FastMCP
 
 from tool_governance.bootstrap import create_governance_runtime, GovernanceRuntime
+from tool_governance.core.runtime_context import RuntimeContext, build_runtime_context
 from tool_governance.core.state_manager import discover_session_id
+from tool_governance.models.state import SessionState
 
 # Lazy singleton — initialised on first tool call.
 _runtime: GovernanceRuntime | None = None
@@ -49,6 +51,22 @@ def _session_id() -> str:
     return os.environ.get("CLAUDE_SESSION_ID", discover_session_id(None))
 
 
+def _build_runtime_ctx(rt: GovernanceRuntime, state: SessionState) -> RuntimeContext:
+    """Build the per-turn RuntimeContext for an MCP tool invocation.
+
+    Mirrors the hook_handler._build_runtime_ctx implementation.
+    Metadata preference order:
+        1. rt.indexer.current_index() — authoritative
+        2. state.skills_metadata — legacy fallback for cold start
+    """
+    metadata = rt.indexer.current_index() or state.skills_metadata
+    return build_runtime_context(
+        state,
+        metadata=metadata,
+        blocked_tools=rt.policy.blocked_tools,
+    )
+
+
 mcp = FastMCP("tool-governance")
 
 
@@ -60,21 +78,22 @@ async def list_skills() -> list[dict[str, Any]]:
     ``SkillIndexer.list_skills``).
     """
     rt = _get_runtime()
-    state = rt.state_manager.load_or_init(_session_id())
-    if not state.skills_metadata:
-        state.skills_metadata = rt.indexer.build_index()
-        rt.state_manager.save(state)
+    sid = _session_id()
+    state = rt.state_manager.load_or_init(sid)
+
+    # Build runtime context to get current metadata
+    ctx = _build_runtime_ctx(rt, state)
 
     result = []
-    for sid, meta in state.skills_metadata.items():
+    for skill_id, meta in ctx.all_skills_metadata.items():
         result.append({
             "skill_id": meta.skill_id,
             "name": meta.name,
             "description": meta.description,
             "risk_level": meta.risk_level,
-            "is_enabled": sid in state.skills_loaded,
+            "is_enabled": skill_id in state.skills_loaded,
         })
-    rt.store.append_audit(_session_id(), "skill.list")
+    rt.store.append_audit(sid, "skill.list")
     return result
 
 
@@ -88,10 +107,21 @@ async def read_skill(skill_id: str) -> dict[str, Any]:
               ``{"error": "... not found"}`` instead of raising.
     """
     rt = _get_runtime()
+    sid = _session_id()
+    state = rt.state_manager.load_or_init(sid)
+
+    # Build runtime context to get current metadata
+    ctx = _build_runtime_ctx(rt, state)
+
+    # Check if skill exists in runtime metadata
+    if skill_id not in ctx.all_skills_metadata:
+        return {"error": f"Skill '{skill_id}' not found"}
+
+    # Read full content from indexer
     content = rt.indexer.read_skill(skill_id)
     if content is None:
         return {"error": f"Skill '{skill_id}' not found"}
-    rt.store.append_audit(_session_id(), "skill.read", skill_id=skill_id)
+    rt.store.append_audit(sid, "skill.read", skill_id=skill_id)
     return dict(content.model_dump())
 
 
@@ -122,22 +152,27 @@ async def enable_skill(
     """
     rt = _get_runtime()
     sid = _session_id()
+    # Step 1: Load persisted state
     state = rt.state_manager.load_or_init(sid)
 
-    meta = state.skills_metadata.get(skill_id)
+    # Step 2: Derive runtime context
+    ctx = _build_runtime_ctx(rt, state)
+
+    meta = ctx.all_skills_metadata.get(skill_id)
     if meta is None:
         return {"granted": False, "reason": f"Skill '{skill_id}' not found"}
 
     if skill_id in state.skills_loaded:
-        return {"granted": True, "reason": "Already enabled", "allowed_tools": state.active_tools}
+        # Return current active_tools from runtime context
+        return {"granted": True, "reason": "Already enabled", "allowed_tools": list(ctx.active_tools)}
 
     decision = rt.policy_engine.evaluate(skill_id, meta, state, reason or None)
     if not decision.allowed:
         rt.store.append_audit(sid, "skill.enable", skill_id=skill_id, decision=decision.decision)
         return {"granted": False, "decision": decision.decision, "reason": decision.reason}
 
+    # Step 3: Mutate persisted-only fields
     capped_ttl = rt.policy_engine.cap_ttl(skill_id, ttl)
-    # Coerce free-form scope string into the Literal type.
     scope_val: Literal["turn", "session"] = "turn" if scope == "turn" else "session"
     granted_by_val: Literal["auto", "user", "policy"] = "auto" if decision.decision == "auto" else "policy"
     grant = rt.grant_manager.create_grant(
@@ -145,14 +180,18 @@ async def enable_skill(
         scope=scope_val, ttl=capped_ttl, granted_by=granted_by_val, reason=reason or None,
     )
     rt.state_manager.add_to_skills_loaded(state, skill_id, version=meta.version)
-    # Store grant keyed by skill_id (not grant_id) for quick
-    # lookup during disable_skill.
     state.active_grants[skill_id] = grant
-    rt.tool_rewriter.recompute_active_tools(state)
+
+    # Rebuild runtime context after mutation to get updated active_tools
+    ctx = _build_runtime_ctx(rt, state)
+    # Mirror to state for backward compatibility
+    state.sync_from_runtime(ctx.active_tools)
+
+    # Step 4: Save persisted state
     rt.state_manager.save(state)
     rt.store.append_audit(sid, "skill.enable", skill_id=skill_id, decision="granted",
                           detail={"scope": scope, "ttl": capped_ttl})
-    return {"granted": True, "allowed_tools": state.active_tools}
+    return {"granted": True, "allowed_tools": list(ctx.active_tools)}
 
 
 @mcp.tool()
@@ -167,17 +206,25 @@ async def disable_skill(skill_id: str) -> dict[str, Any]:
     """
     rt = _get_runtime()
     sid = _session_id()
+    # Step 1: Load persisted state
     state = rt.state_manager.load_or_init(sid)
 
     if skill_id not in state.skills_loaded:
         return {"disabled": False, "reason": "Skill not enabled"}
 
+    # Step 3: Mutate persisted-only fields
     grant = state.active_grants.get(skill_id)
     if grant:
         rt.grant_manager.revoke_grant(grant.grant_id, reason="explicit")
 
     rt.state_manager.remove_from_skills_loaded(state, skill_id)
-    rt.tool_rewriter.recompute_active_tools(state)
+
+    # Step 2: Derive runtime context after mutation
+    ctx = _build_runtime_ctx(rt, state)
+    # Mirror to state for backward compatibility
+    state.sync_from_runtime(ctx.active_tools)
+
+    # Step 4: Save persisted state
     rt.state_manager.save(state)
     rt.store.append_audit(sid, "skill.disable", skill_id=skill_id, decision="revoked")
     return {"disabled": True}
@@ -193,6 +240,12 @@ async def grant_status() -> list[dict[str, Any]]:
     """
     rt = _get_runtime()
     sid = _session_id()
+    # Step 1: Load persisted state (for consistency with other entry points)
+    state = rt.state_manager.load_or_init(sid)
+    # Step 2: Derive runtime context (not used, but maintains four-step pattern)
+    ctx = _build_runtime_ctx(rt, state)
+    # Step 3: No mutation (read-only operation)
+    # Step 4: No save needed (read-only operation)
     grants = rt.grant_manager.get_active_grants(sid)
     return [g.model_dump() for g in grants]
 
@@ -216,6 +269,7 @@ async def run_skill_action(skill_id: str, op: str, args: dict[str, Any] | None =
     """
     rt = _get_runtime()
     sid = _session_id()
+    # Step 1: Load persisted state
     state = rt.state_manager.load_or_init(sid)
 
     if skill_id not in state.skills_loaded:
@@ -224,9 +278,12 @@ async def run_skill_action(skill_id: str, op: str, args: dict[str, Any] | None =
     if not rt.grant_manager.is_grant_valid(sid, skill_id):
         return {"error": f"Grant for '{skill_id}' has expired. Re-enable the skill."}
 
+    # Step 2: Derive runtime context to get metadata
+    ctx = _build_runtime_ctx(rt, state)
+
     # Deny-by-default when metadata is unresolved: we cannot evaluate
     # allowed_ops without it, so dispatching would bypass the guard.
-    meta = state.skills_metadata.get(skill_id)
+    meta = ctx.all_skills_metadata.get(skill_id)
     if meta is None:
         rt.store.append_audit(
             sid, "skill.action.deny", skill_id=skill_id,
@@ -237,6 +294,8 @@ async def run_skill_action(skill_id: str, op: str, args: dict[str, Any] | None =
     if op not in meta.allowed_ops:
         return {"error": f"Operation '{op}' is not in allowed_ops for '{skill_id}'"}
 
+    # Step 3: No mutation (execution only)
+    # Step 4: No save needed (execution only)
     from tool_governance.core.skill_executor import dispatch
     try:
         result = dispatch(skill_id, op, args or {})
@@ -256,12 +315,16 @@ async def change_stage(skill_id: str, stage_id: str) -> dict[str, Any]:
     """
     rt = _get_runtime()
     sid = _session_id()
+    # Step 1: Load persisted state
     state = rt.state_manager.load_or_init(sid)
 
     if skill_id not in state.skills_loaded:
         return {"error": f"Skill '{skill_id}' must be enabled first"}
 
-    meta = state.skills_metadata.get(skill_id)
+    # Step 2: Derive runtime context to get metadata
+    ctx = _build_runtime_ctx(rt, state)
+
+    meta = ctx.all_skills_metadata.get(skill_id)
     if meta is None:
         return {"error": f"Skill '{skill_id}' not found"}
 
@@ -272,12 +335,19 @@ async def change_stage(skill_id: str, stage_id: str) -> dict[str, Any]:
     if stage_id not in valid_stages:
         return {"error": f"Stage '{stage_id}' not defined. Valid: {sorted(valid_stages)}"}
 
+    # Step 3: Mutate persisted-only field (current_stage)
     state.skills_loaded[skill_id].current_stage = stage_id
-    rt.tool_rewriter.recompute_active_tools(state)
+
+    # Rebuild runtime context after mutation to get updated active_tools
+    ctx = _build_runtime_ctx(rt, state)
+    # Mirror to state for backward compatibility
+    state.sync_from_runtime(ctx.active_tools)
+
+    # Step 4: Save persisted state
     rt.state_manager.save(state)
     rt.store.append_audit(sid, "stage.change", skill_id=skill_id,
                           detail={"new_stage": stage_id})
-    return {"changed": True, "new_active_tools": state.active_tools}
+    return {"changed": True, "new_active_tools": list(ctx.active_tools)}
 
 
 @mcp.tool()
@@ -291,10 +361,17 @@ async def refresh_skills() -> dict[str, Any]:
     """
     rt = _get_runtime()
     sid = _session_id()
+    # Step 1: Load persisted state (for consistency)
     state = rt.state_manager.load_or_init(sid)
+
+    # Step 2: Refresh indexer (clears caches and rescans)
     count = rt.indexer.refresh()
-    state.skills_metadata = rt.indexer.current_index()
-    rt.state_manager.save(state)
+
+    # Step 3: No mutation to state.skills_metadata (it's a derived field)
+    # The next turn's build_runtime_context will pick up fresh metadata
+    # from indexer.current_index()
+
+    # Step 4: No save needed (no state mutation)
     return {"refreshed": True, "skill_count": count}
 
 

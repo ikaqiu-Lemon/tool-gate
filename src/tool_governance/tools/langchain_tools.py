@@ -17,6 +17,8 @@ from typing import Any, Literal
 
 from langchain_core.tools import tool
 
+from tool_governance.core.runtime_context import build_runtime_context
+
 
 @tool
 def list_skills_tool(runtime: Any) -> list[dict[str, Any]]:
@@ -70,21 +72,31 @@ def enable_skill_tool(
             - An unrecognised ``scope`` string is coerced to
               ``"session"`` rather than raising.
     """
+    # Step 1: load
     state = runtime.state_manager.load_or_init(session_id)
-    meta = state.skills_metadata.get(skill_id)
+
+    # Step 2: derive runtime context
+    metadata = runtime.indexer.current_index() or state.skills_metadata
+    ctx = build_runtime_context(
+        state,
+        metadata=metadata,
+        blocked_tools=runtime.policy.blocked_tools,
+    )
+
+    # Check metadata from runtime context
+    meta = ctx.all_skills_metadata.get(skill_id)
     if meta is None:
         return {"granted": False, "reason": f"Skill '{skill_id}' not found"}
 
     if skill_id in state.skills_loaded:
-        return {"granted": True, "reason": "Already enabled", "allowed_tools": state.active_tools}
+        return {"granted": True, "reason": "Already enabled", "allowed_tools": ctx.active_tools}
 
+    # Step 3: mutate state
     decision = runtime.policy_engine.evaluate(skill_id, meta, state, reason or None)
     if not decision.allowed:
         return {"granted": False, "decision": decision.decision, "reason": decision.reason}
 
     capped_ttl = runtime.policy_engine.cap_ttl(skill_id, ttl)
-    # Mirror mcp_server.enable_skill for scope + granted_by so both
-    # entry points produce equivalent grants.
     scope_val: Literal["turn", "session"] = "turn" if scope == "turn" else "session"
     granted_by_val: Literal["auto", "user", "policy"] = (
         "auto" if decision.decision == "auto" else "policy"
@@ -100,9 +112,17 @@ def enable_skill_tool(
     )
     runtime.state_manager.add_to_skills_loaded(state, skill_id, version=meta.version)
     state.active_grants[skill_id] = grant
-    active = runtime.tool_rewriter.recompute_active_tools(state)
+
+    # Recompute active_tools after mutation
+    ctx = build_runtime_context(
+        state,
+        metadata=metadata,
+        blocked_tools=runtime.policy.blocked_tools,
+    )
+
+    # Step 4: save
     runtime.state_manager.save(state)
-    return {"granted": True, "allowed_tools": active}
+    return {"granted": True, "allowed_tools": ctx.active_tools}
 
 
 @tool
@@ -114,16 +134,21 @@ def disable_skill_tool(skill_id: str, runtime: Any, session_id: str = "") -> dic
             - If the skill has no grant in ``active_grants``,
               the revoke step is silently skipped.
     """
+    # Step 1: load
     state = runtime.state_manager.load_or_init(session_id)
+
+    # Step 2: derive (not needed for disable, but kept for consistency)
     if skill_id not in state.skills_loaded:
         return {"disabled": False, "reason": "Skill not enabled"}
 
+    # Step 3: mutate state
     grant = state.active_grants.get(skill_id)
     if grant:
         runtime.grant_manager.revoke_grant(grant.grant_id, reason="explicit")
 
     runtime.state_manager.remove_from_skills_loaded(state, skill_id)
-    runtime.tool_rewriter.recompute_active_tools(state)
+
+    # Step 4: save
     runtime.state_manager.save(state)
     return {"disabled": True}
 

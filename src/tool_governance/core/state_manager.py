@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import time
 from datetime import datetime
@@ -83,6 +84,17 @@ class StateManager:
         Side effect: mutates ``state.updated_at`` to ``utcnow()``
         before serialising.
 
+        Stage C3 of ``separate-runtime-and-persisted-state`` narrowed
+        this path from a full ``model_dump_json()`` to
+        ``SessionState.to_persisted_dict()``.  Stage D of
+        ``migrate-entrypoints-to-runtime-flow`` expanded the exclusion
+        set to include both ``active_tools`` and ``skills_metadata``
+        after all MCP / LangChain entry points migrated to reading from
+        ``RuntimeContext`` instead of the persisted mirror.  Legacy rows
+        written before the narrowing still load cleanly: pydantic's
+        default ``extra="ignore"`` handling silently drops any
+        obsolete keys on ``model_validate``.
+
         Contract:
             Raises:
                 sqlite3.OperationalError: If the database file is
@@ -90,7 +102,8 @@ class StateManager:
                     not caught).
         """
         state.updated_at = datetime.utcnow()
-        self._store.save_session(state.session_id, state.model_dump_json())
+        payload = state.to_persisted_dict()
+        self._store.save_session(state.session_id, json.dumps(payload))
 
     def add_to_skills_loaded(
         self, state: SessionState, skill_id: str, version: str = "1.0.0"

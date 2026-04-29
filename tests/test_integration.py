@@ -92,7 +92,8 @@ class TestFullFlow:
         grant → add to loaded → recompute) to verify each step."""
         handle_session_start({"session_id": "test-flow"})
         state = runtime.state_manager.load_or_init("test-flow")
-        meta = state.skills_metadata.get("repo-read")
+        # Stage D: read from indexer instead of persisted state.
+        meta = runtime.indexer.current_index().get("repo-read")
         assert meta is not None
 
         # Policy evaluation: low risk → auto → allowed
@@ -101,7 +102,7 @@ class TestFullFlow:
         grant = runtime.grant_manager.create_grant("test-flow", "repo-read", meta.allowed_ops)
         runtime.state_manager.add_to_skills_loaded(state, "repo-read")
         state.active_grants["repo-read"] = grant
-        runtime.tool_rewriter.recompute_active_tools(state)
+        runtime.tool_rewriter.recompute_active_tools(state, runtime.indexer)
         runtime.state_manager.save(state)
 
         assert "Read" in state.active_tools
@@ -139,11 +140,11 @@ class TestFullFlow:
         Exercises the full chain: enable → recompute → gate check."""
         handle_session_start({"session_id": "test-allow"})
         state = runtime.state_manager.load_or_init("test-allow")
-        meta = state.skills_metadata["repo-read"]
+        meta = runtime.indexer.current_index()["repo-read"]
         grant = runtime.grant_manager.create_grant("test-allow", "repo-read", meta.allowed_ops)
         runtime.state_manager.add_to_skills_loaded(state, "repo-read")
         state.active_grants["repo-read"] = grant
-        runtime.tool_rewriter.recompute_active_tools(state)
+        runtime.tool_rewriter.recompute_active_tools(state, runtime.indexer)
         runtime.state_manager.save(state)
 
         result = handle_pre_tool_use({
@@ -186,12 +187,12 @@ class TestTTLExpiry:
         strictly in the past before the cleanup runs."""
         handle_session_start({"session_id": "test-ttl"})
         state = runtime.state_manager.load_or_init("test-ttl")
-        meta = state.skills_metadata["repo-read"]
+        meta = runtime.indexer.current_index()["repo-read"]
         # ttl=0 means expires_at == created_at — already expired.
         grant = runtime.grant_manager.create_grant("test-ttl", "repo-read", meta.allowed_ops, ttl=0)
         runtime.state_manager.add_to_skills_loaded(state, "repo-read")
         state.active_grants["repo-read"] = grant
-        runtime.tool_rewriter.recompute_active_tools(state)
+        runtime.tool_rewriter.recompute_active_tools(state, runtime.indexer)
         runtime.state_manager.save(state)
 
         import time
@@ -213,7 +214,7 @@ class TestStageSwitch:
         new tool set."""
         handle_session_start({"session_id": "test-stage"})
         state = runtime.state_manager.load_or_init("test-stage")
-        meta = state.skills_metadata["code-edit"]
+        meta = runtime.indexer.current_index()["code-edit"]
 
         # Medium risk requires a reason — provide one.
         decision = runtime.policy_engine.evaluate("code-edit", meta, state, reason="fixing bug")
@@ -221,7 +222,7 @@ class TestStageSwitch:
         grant = runtime.grant_manager.create_grant("test-stage", "code-edit", meta.allowed_ops)
         runtime.state_manager.add_to_skills_loaded(state, "code-edit")
         state.active_grants["code-edit"] = grant
-        runtime.tool_rewriter.recompute_active_tools(state)
+        runtime.tool_rewriter.recompute_active_tools(state, runtime.indexer)
         runtime.state_manager.save(state)
 
         # Default stage = first stage = analysis → Read-only tools.
@@ -230,7 +231,7 @@ class TestStageSwitch:
 
         # Switch to execution stage → write tools appear.
         state.skills_loaded["code-edit"].current_stage = "execution"
-        runtime.tool_rewriter.recompute_active_tools(state)
+        runtime.tool_rewriter.recompute_active_tools(state, runtime.indexer)
         assert "Edit" in state.active_tools
         assert "Write" in state.active_tools
 
@@ -273,12 +274,14 @@ class TestRunSkillActionMetaMissing:
 
         handle_session_start({"session_id": sid})  # populate skills_metadata
         state = runtime.state_manager.load_or_init(sid)
-        meta = state.skills_metadata["repo-read"]
+        meta = runtime.indexer.current_index()["repo-read"]
         grant = runtime.grant_manager.create_grant(sid, "repo-read", meta.allowed_ops)
         runtime.state_manager.add_to_skills_loaded(state, "repo-read")
         state.active_grants["repo-read"] = grant
         # Force the meta-missing branch: skill is loaded but metadata is absent.
-        state.skills_metadata.pop("repo-read")
+        # Remove from indexer's registry so current_index() won't return it
+        if "repo-read" in runtime.indexer._indexed_skills:
+            runtime.indexer._indexed_skills.pop("repo-read")
         runtime.state_manager.save(state)
 
         dispatch_calls: list[tuple[str, str]] = []
@@ -312,7 +315,7 @@ class TestRunSkillActionMetaMissing:
 
         handle_session_start({"session_id": sid})
         state = runtime.state_manager.load_or_init(sid)
-        meta = state.skills_metadata["repo-read"]
+        meta = runtime.indexer.current_index()["repo-read"]
         grant = runtime.grant_manager.create_grant(sid, "repo-read", meta.allowed_ops)
         runtime.state_manager.add_to_skills_loaded(state, "repo-read")
         state.active_grants["repo-read"] = grant
@@ -345,9 +348,9 @@ class TestPostToolUseSingleStamp:
         # Inject a synthetic second skill that also advertises "Read" at
         # the top level.  We reuse repo-read's metadata shape and just
         # substitute skill_id so policy/grant plumbing stays identical.
-        original = state.skills_metadata["repo-read"]
+        original = runtime.indexer.current_index()["repo-read"]
         clone = original.model_copy(update={"skill_id": "repo-read-clone", "name": "Clone"})
-        state.skills_metadata["repo-read-clone"] = clone
+        runtime.indexer.current_index()["repo-read-clone"] = clone
 
         for skill_id in ("repo-read", "repo-read-clone"):
             grant = runtime.grant_manager.create_grant(sid, skill_id, original.allowed_ops)
@@ -381,7 +384,7 @@ class TestPostToolUseSingleStamp:
         # Make sure iteration reaches code-edit first, then have a second
         # skill that also top-level-matches "Edit".  If the stage-level
         # break only exits the inner loop, repo-read-editor would overwrite.
-        code_edit_meta = state.skills_metadata["code-edit"]
+        code_edit_meta = runtime.indexer.current_index()["code-edit"]
         editor_clone = code_edit_meta.model_copy(update={
             "skill_id": "editor-clone",
             "name": "Editor Clone",
@@ -389,7 +392,7 @@ class TestPostToolUseSingleStamp:
             "allowed_tools": ["Edit"],
             "allowed_ops": ["edit"],
         })
-        state.skills_metadata["editor-clone"] = editor_clone
+        runtime.indexer.current_index()["editor-clone"] = editor_clone
 
         # Enable code-edit with execution stage and the clone.
         grant1 = runtime.grant_manager.create_grant(sid, "code-edit", code_edit_meta.allowed_ops)
@@ -418,7 +421,7 @@ class TestPostToolUseSingleStamp:
         sid = "test-d1-noop"
         handle_session_start({"session_id": sid})
         state = runtime.state_manager.load_or_init(sid)
-        meta = state.skills_metadata["repo-read"]
+        meta = runtime.indexer.current_index()["repo-read"]
         grant = runtime.grant_manager.create_grant(sid, "repo-read", meta.allowed_ops)
         runtime.state_manager.add_to_skills_loaded(state, "repo-read")
         state.active_grants["repo-read"] = grant
@@ -620,11 +623,13 @@ class TestMetaNoneEdgeCases:
 
         # Enable code-edit (staged), then force the meta-missing state.
         state = runtime.state_manager.load_or_init(sid)
-        meta = state.skills_metadata["code-edit"]
+        meta = runtime.indexer.current_index()["code-edit"]
         grant = runtime.grant_manager.create_grant(sid, "code-edit", meta.allowed_ops)
         runtime.state_manager.add_to_skills_loaded(state, "code-edit")
         state.active_grants["code-edit"] = grant
-        state.skills_metadata.pop("code-edit")
+        # Remove from indexer's registry so current_index() won't return it
+        if "code-edit" in runtime.indexer._indexed_skills:
+            runtime.indexer._indexed_skills.pop("code-edit")
         runtime.state_manager.save(state)
 
         try:
@@ -680,14 +685,16 @@ class TestMetaNoneEdgeCases:
         sid = "meta-none-rewriter"
         handle_session_start({"session_id": sid})
         state = runtime.state_manager.load_or_init(sid)
-        meta = state.skills_metadata["repo-read"]
+        meta = runtime.indexer.current_index()["repo-read"]
         grant = runtime.grant_manager.create_grant(sid, "repo-read", meta.allowed_ops)
         runtime.state_manager.add_to_skills_loaded(state, "repo-read")
         state.active_grants["repo-read"] = grant
         # Force the meta-missing branch inside ToolRewriter.
-        state.skills_metadata.pop("repo-read")
+        # Remove from indexer so RuntimeContext won't find it.
+        if "repo-read" in runtime.indexer._indexed_skills:
+            runtime.indexer._indexed_skills.pop("repo-read")
 
-        active = runtime.tool_rewriter.recompute_active_tools(state)
+        active = runtime.tool_rewriter.recompute_active_tools(state, runtime.indexer)
 
         assert set(active) == set(META_TOOLS)  # no skill tools contributed
         assert "Read" not in active

@@ -25,8 +25,11 @@ class TestSessionStartIndexesMockSkills:
         with runtime_context(tmp_path) as rt:
             result = hook_handler.handle_session_start(events.session_start(session_id))
 
-            state = rt.state_manager.load_or_init(session_id)
-            ids = set(state.skills_metadata.keys())
+            # Stage D of ``migrate-entrypoints-to-runtime-flow``:
+            # ``skills_metadata`` is no longer persisted.  Read from
+            # the authoritative indexer instead.
+            metadata = rt.indexer.current_index()
+            ids = set(metadata.keys())
             for expected in (
                 "mock_readonly",
                 "mock_stageful",
@@ -115,6 +118,10 @@ class TestUserPromptSubmitRefreshesContext:
             assert "[ENABLED" in ctx
 
             state = rt.state_manager.load_or_init(session_id)
+            # Stage C3 excluded ``active_tools`` from the persisted
+            # payload; recompute the in-memory derivation before
+            # asserting against it.
+            rt.tool_rewriter.recompute_active_tools(state, rt.indexer)
             assert "mock_read" in state.active_tools
             assert "mock_glob" in state.active_tools
 
@@ -164,13 +171,14 @@ class TestPostToolUseWriteback:
             # Set up grant directly so the assertion is scoped to the
             # PostToolUse handler and does not depend on enable_skill.
             state = rt.state_manager.load_or_init(session_id)
-            meta = state.skills_metadata["mock_readonly"]
+            # Stage D: read from indexer instead of persisted state.
+            meta = rt.indexer.current_index()["mock_readonly"]
             grant = rt.grant_manager.create_grant(
                 session_id, "mock_readonly", meta.allowed_ops
             )
             rt.state_manager.add_to_skills_loaded(state, "mock_readonly")
             state.active_grants["mock_readonly"] = grant
-            rt.tool_rewriter.recompute_active_tools(state)
+            rt.tool_rewriter.recompute_active_tools(state, rt.indexer)
             rt.state_manager.save(state)
 
             hook_handler.handle_post_tool_use(

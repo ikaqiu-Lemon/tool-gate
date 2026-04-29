@@ -28,13 +28,14 @@ class TestTTLExpiryInvalidatesRunSkillAction:
             hook_handler.handle_session_start(events.session_start(session_id))
 
             state = rt.state_manager.load_or_init(session_id)
-            meta = state.skills_metadata["mock_ttl"]
+            # Stage D: read from indexer instead of persisted state.
+            meta = rt.indexer.current_index()["mock_ttl"]
             grant = rt.grant_manager.create_grant(
                 session_id, "mock_ttl", meta.allowed_ops, ttl=0
             )
             rt.state_manager.add_to_skills_loaded(state, "mock_ttl")
             state.active_grants["mock_ttl"] = grant
-            rt.tool_rewriter.recompute_active_tools(state)
+            rt.tool_rewriter.recompute_active_tools(state, rt.indexer)
             rt.state_manager.save(state)
 
             time.sleep(0.1)  # ensure expires_at < now
@@ -54,13 +55,14 @@ class TestUserPromptSubmitReclaimsExpiredGrant:
             hook_handler.handle_session_start(events.session_start(session_id))
 
             state = rt.state_manager.load_or_init(session_id)
-            meta = state.skills_metadata["mock_ttl"]
+            # Stage D: read from indexer instead of persisted state.
+            meta = rt.indexer.current_index()["mock_ttl"]
             grant = rt.grant_manager.create_grant(
                 session_id, "mock_ttl", meta.allowed_ops, ttl=0
             )
             rt.state_manager.add_to_skills_loaded(state, "mock_ttl")
             state.active_grants["mock_ttl"] = grant
-            rt.tool_rewriter.recompute_active_tools(state)
+            rt.tool_rewriter.recompute_active_tools(state, rt.indexer)
             rt.state_manager.save(state)
 
             time.sleep(0.1)

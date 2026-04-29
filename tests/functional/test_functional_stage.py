@@ -32,7 +32,11 @@ class TestChangeStageSwapsToolSet:
             assert enable_resp["granted"] is True
 
             # Default stage is the first listed (analysis) — read tools only.
+            # Stage C3 excluded ``active_tools`` from the persisted
+            # payload, so we recompute the in-memory view from the
+            # still-persisted skills_metadata + skills_loaded.
             state = rt.state_manager.load_or_init(session_id)
+            rt.tool_rewriter.recompute_active_tools(state, rt.indexer)
             assert "mock_read" in state.active_tools
             assert "mock_glob" in state.active_tools
             assert "mock_edit" not in state.active_tools

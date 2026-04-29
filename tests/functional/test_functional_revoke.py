@@ -26,13 +26,21 @@ class TestDisableSkillRevokesAndAudits:
             hook_handler.handle_session_start(events.session_start(session_id))
             asyncio.run(mcp_server.enable_skill(skill_id="mock_readonly"))
 
+            # Stage C3 of separate-runtime-and-persisted-state excluded
+            # ``active_tools`` from the persisted payload, so a fresh
+            # ``load_or_init`` returns an empty list.  Recompute from
+            # the still-persisted skills_metadata + skills_loaded to
+            # inspect the live tool set — this mirrors what MCP meta
+            # tools do internally before returning.
             state = rt.state_manager.load_or_init(session_id)
+            rt.tool_rewriter.recompute_active_tools(state, rt.indexer)
             assert "mock_read" in state.active_tools
 
             resp = asyncio.run(mcp_server.disable_skill(skill_id="mock_readonly"))
             assert resp["disabled"] is True
 
             state = rt.state_manager.load_or_init(session_id)
+            rt.tool_rewriter.recompute_active_tools(state, rt.indexer)
             assert "mock_readonly" not in state.skills_loaded
             assert "mock_read" not in state.active_tools
             assert "mock_glob" not in state.active_tools

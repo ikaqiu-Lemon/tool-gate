@@ -1160,6 +1160,87 @@ the implementation, and D8 is documented above.
 
 ---
 
+## Addendum — Runtime vs Persisted Session State (`separate-runtime-and-persisted-state`)
+
+**Source change**: `openspec/changes/separate-runtime-and-persisted-state/`
+**Completion**: Stage A 2026-04-21 · Stages B/C/D 2026-04-21
+**Follow-up**: `migrate-entrypoints-to-runtime-flow` (2026-04-28) completed deferred serialization exclusion and MCP migration
+
+Narrow-scope semantic refactor: at the **L1 (session) layer**, splits
+what used to be one undifferentiated `SessionState` into two conceptual
+roles — a **persisted record** that survives across hook processes and
+a **per-turn runtime view** that a hook rebuilds from scratch on every
+invocation.  The cache layer §3.4 remains the L2 (in-process, cross-turn)
+boundary; nothing in this change touches the L2 contract.
+
+### Final field classification
+
+| Field on `SessionState` | Class | Notes |
+|---|---|---|
+| `session_id` | persisted-only | Row identity in the `sessions` table. |
+| `skills_loaded` (+ all `LoadedSkillInfo.*`) | persisted-only | Cross-turn continuity of authorised skills; `current_stage` / `last_used_at` are durable writes. |
+| `active_grants` | persisted-only | Grant-state continuity for `enable_skill` / `disable_skill`. |
+| `created_at` / `updated_at` | persisted-only | Audit anchors. |
+| `skills_metadata` | derived (excluded from persistence) | Real authority = `SkillIndexer.current_index()` (§3.4 cache layer).  **Excluded from persisted JSON** as of `migrate-entrypoints-to-runtime-flow` Stage D (2026-04-28). |
+| `active_tools` | derived (excluded from persistence) | Real authority = `RuntimeContext.active_tools`.  **Excluded from persisted JSON** as of `separate-runtime-and-persisted-state` Stage C3 (2026-04-21). |
+
+### Runtime-only structure — `RuntimeContext`
+
+`src/tool_governance/core/runtime_context.py` exposes an immutable
+frozen dataclass never persisted to SQLite:
+
+```python
+@dataclass(frozen=True)
+class RuntimeContext:
+    active_tools: tuple[str, ...]
+    enabled_skills: tuple[EnabledSkillView, ...]
+    all_skills_metadata: Mapping[str, SkillMetadata]
+    policy: PolicySnapshot
+    clock: datetime
+```
+
+Built once per hook entry by `build_runtime_context(state, metadata,
+blocked_tools, clock)`.  Pure function — no state mutation, no SQLite
+writes, no indexer rebuild.  Metadata fallback chain:
+`indexer.current_index()` → `state.skills_metadata` (for cold start).
+
+### Hook lifecycle (post-Stage-C)
+
+Every hook handler in `src/tool_governance/hook_handler.py` follows:
+
+1. **Load persisted** — `state_manager.load_or_init(session_id)`;
+   reconcile durable state (cleanup expired grants; first-time index
+   populate on `SessionStart`).
+2. **Derive runtime view** — `ctx = _build_runtime_ctx(rt, state)`.
+3. **Rewrite / compose / gate** — `ctx` is the only input to
+   `tool_rewriter.compute_active_tools`, `prompt_composer.compose_*`,
+   and the `PreToolUse` gate check
+   (`tool_name in ctx.active_tools_set()`).  `state.sync_from_runtime()`
+   mirrors the derived `active_tools` into the persisted field as a
+   compat shim for unmigrated MCP readers.
+4. **Persist durable fields** — `state_manager.save(state)`.
+
+### Safe-degradation policies
+
+| Scenario | Behaviour |
+|---|---|
+| Persisted record missing | Empty runtime view (meta-tools − blocked); gate denies non-meta tools without crashing. |
+| `skills_loaded` references a skill absent from the index | Skipped in runtime view; persisted entry preserved for audit; no tools granted on its behalf. |
+| Persisted JSON carries legacy `active_tools` / `skills_metadata` | Loaded via pydantic `extra="ignore"` default; runtime view derived from live sources; legacy values never become authoritative. |
+| `indexer.current_index()` returns `{}` | Falls back to `state.skills_metadata`; if that is also empty, runtime view contains only meta-tools. |
+| Grant past its TTL | Existing `grant_manager.cleanup_expired` path removes it from `skills_loaded` before `build_runtime_context`. |
+
+### Completed in follow-up change (`migrate-entrypoints-to-runtime-flow`)
+
+**Source change**: `openspec/changes/migrate-entrypoints-to-runtime-flow/`
+**Completion**: Stages A–D 2026-04-28
+
+- **Serialization exclusion** — `SessionState.DERIVED_FIELDS = {"active_tools", "skills_metadata"}` now excludes both fields from `to_persisted_dict()`. `state_manager.save()` uses this method, so neither field is written to `sessions.state_json`. Contract tests in `tests/test_state_manager.py::TestPersistedFieldContract` verify exclusion.
+- **Grant expiry filtering** — `build_runtime_context()` now checks grant expiry before including skills in `active_tools`. Expired grants no longer contribute tools to the runtime view. Regression test in `tests/test_grant_expiry_runtime_view.py`.
+- **MCP meta-tool migration** — All 8 `@mcp.tool` entries in `mcp_server.py` migrated to runtime-flow pattern: `ctx = build_runtime_context(state, indexer.current_index(), ...)` → operate on `ctx.active_tools`. The `recompute_active_tools(state, indexer)` adapter remains for test compatibility but is no longer used in production hooks.
+
+---
+
 ## 11 References
 
 - [Claude Code Plugins Reference](https://code.claude.com/docs/en/plugins-reference)

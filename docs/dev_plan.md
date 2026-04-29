@@ -705,3 +705,36 @@ Archive order: archived after `add-delivery-demo-workspaces`
 (delivery-demo-harness spec already promoted to
 `openspec/specs/delivery-demo-harness/` when the predecessor change
 was archived 2026-04-21).
+
+---
+
+## migrate-entrypoints-to-runtime-flow (2026-04-28)
+
+**Goal:** Migrate all hook entry points to accept `RuntimeContext` instead of raw `SessionState`, separating runtime-derived state from persisted state.
+
+**Stages:**
+- **Stage A (Inventory):** Cataloged all hook entry points and their current signatures. Identified that `compose()`, `pre_tool_use()`, `post_tool_use()`, and `user_prompt_submit()` all accept raw `SessionState`.
+- **Stage B (RuntimeContext):** Created `RuntimeContext` dataclass with `state`, `indexer`, `clock`, and `active_tools` fields. Implemented `build_runtime_context()` to construct it from `SessionState` and `SkillIndexer`. Added grant expiry filtering logic so expired grants don't contribute tools to `active_tools`.
+- **Stage C (Migration):** Updated all four hook entry points to accept `RuntimeContext` instead of `SessionState`. Updated `HookHandler` to build `RuntimeContext` before calling hooks. Migrated all tests to use `RuntimeContext`.
+- **Stage D (Persistence):** Marked `skills_metadata` and `active_tools` as derived fields, excluded from persistence via `SessionState.to_persisted_dict()`. Updated `StateManager.save()` to use the new method. Added `indexer` parameter to `recompute_active_tools()` so it can fetch metadata from the indexer instead of persisted state.
+- **Stage E (Closeout):** Documentation updates, validation, and archival.
+
+**Key design decisions:**
+- `RuntimeContext` is the single source of truth for hook entry points. Hooks should never directly access `state.skills_metadata` or `state.active_tools`.
+- `skills_metadata` is now always fetched from `SkillIndexer.current_index()` at runtime, ensuring it reflects the latest skill definitions on disk.
+- `active_tools` is computed from `active_grants` and `skills_metadata` at runtime, filtered by grant expiry.
+- Persisted state only contains durable fields: `skills_loaded`, `active_grants`, `last_used_at`.
+
+**Test coverage:**
+- 238 tests passing, including new tests for grant expiry filtering (`test_grant_expiry_runtime_view.py`) and hook lifecycle (`test_hook_lifecycle.py`).
+- All functional tests updated to use `RuntimeContext` and pass `indexer` to `recompute_active_tools()`.
+
+**Commits:**
+- Stage B: `83fc08c` - stage C-root: wire examples/README to QUICKSTART
+- Stage C: `50649cd` - stage C-03: migrate 03-lifecycle-and-risk README
+- Stage C: `2e049ab` - stage C-02: migrate 02-doc-edit-staged README
+- Stage D: `b5cb88b` - stage D: exclude skills_metadata from persistence, add grant expiry filtering
+
+**Related changes:**
+- Completes the deferred work from `separate-runtime-and-persisted-state` (see `docs/technical_design.md` Addendum).
+- Enables future work on skill hot-reloading and dynamic metadata updates without state file churn.

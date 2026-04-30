@@ -98,3 +98,55 @@ The `additionalContext` injected by UserPromptSubmit SHALL be within 800 charact
 - **WHEN** 10 skills are registered but only 1 is enabled
 - **THEN** the additionalContext stays within 800 characters, with the enabled skill showing full detail and the remaining 9 showing only summary lines
 
+### Requirement: Tool rewriting consumes RuntimeContext
+
+The `ToolRewriter.recompute_active_tools` method SHALL accept a `RuntimeContext` parameter and derive `active_tools` from `ctx.active_tools` (not from `state.active_tools`). The method is now a thin adapter that emits a `DeprecationWarning` and delegates to `compute_active_tools(ctx)`. Direct callers SHOULD migrate to `compute_active_tools` or `build_runtime_context`. The `state.active_tools` field is maintained for backward compatibility via `sync_from_runtime` but is not the source of truth.
+
+#### Scenario: recompute_active_tools emits deprecation warning
+
+- **WHEN** legacy code calls `recompute_active_tools(state, indexer, policy, clock)`
+- **THEN** the method emits a `DeprecationWarning` with message "recompute_active_tools is deprecated; use compute_active_tools or build_runtime_context", then builds a `RuntimeContext` internally and returns `ctx.active_tools`
+
+#### Scenario: compute_active_tools derives from RuntimeContext
+
+- **WHEN** new code calls `compute_active_tools(ctx)` where `ctx` is a `RuntimeContext`
+- **THEN** the function returns `ctx.active_tools` directly (the runtime view already contains the computed tool surface)
+
+#### Scenario: state.active_tools is synced from runtime for compatibility
+
+- **WHEN** `build_runtime_context` completes and returns a `RuntimeContext`
+- **THEN** the caller MAY call `state.sync_from_runtime(ctx)` to mirror `ctx.active_tools` into `state.active_tools` for legacy code paths that still read `state.active_tools`
+
+### Requirement: LangChain tool surface follows unified runtime flow
+
+The `langchain_tools.get_allowed_tools` function SHALL follow the unified four-step pattern: (1) load persisted state, (2) build `RuntimeContext`, (3) return `ctx.active_tools` (not `state.active_tools`), (4) no state mutation (read-only operation). The function MUST NOT directly read `state.active_tools` or `state.skills_metadata`.
+
+#### Scenario: LangChain integration derives tools from RuntimeContext
+
+- **WHEN** a LangChain agent calls `get_allowed_tools(session_id)` to fetch the current tool surface
+- **THEN** the function: (1) loads state via `state_manager.load_or_init`, (2) builds `RuntimeContext` via `build_runtime_context(state, indexer, policy, clock)`, (3) returns `list(ctx.active_tools)` (not `list(state.active_tools)`)
+
+#### Scenario: LangChain sees expired grants removed from tool surface
+
+- **WHEN** a skill's grant expired between turns and LangChain calls `get_allowed_tools`
+- **THEN** the function builds a fresh `RuntimeContext` that filters out expired grants, and the returned tool list excludes tools from the expired skill
+
+### Requirement: Expired grants removed from runtime-visible tool surface
+
+The `build_runtime_context` function SHALL filter out skills whose grants have expired (via `policy.is_grant_expired(grant, clock.now())`). Only skills with active (non-expired) grants in `state.active_grants` SHALL contribute tools to `RuntimeContext.active_tools`. The `state.active_tools` field (if still populated by legacy code) MAY contain expired-grant tools, but `RuntimeContext.active_tools` MUST NOT.
+
+#### Scenario: Expired grant tools not in ctx.active_tools
+
+- **WHEN** "repo-read" has an expired grant and `build_runtime_context` is called
+- **THEN** "repo-read" is excluded from `enabled_skills`, its tools (Read, Glob, Grep) are NOT added to `ctx.active_tools`, and the returned `RuntimeContext.active_tools` contains only meta-tools and tools from non-expired skills
+
+#### Scenario: Mixed expired and active grants
+
+- **WHEN** "repo-read" has an expired grant and "web-search" has an active grant
+- **THEN** `ctx.active_tools` contains meta-tools + WebSearch + WebFetch (from "web-search") but NOT Read, Glob, Grep (from expired "repo-read")
+
+#### Scenario: No grants means no skill tools
+
+- **WHEN** `state.active_grants` is empty (no grants exist)
+- **THEN** `ctx.active_tools` contains only meta-tools (list_skills, read_skill, enable_skill, etc.), no skill-contributed tools
+

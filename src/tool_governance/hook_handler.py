@@ -243,25 +243,28 @@ def _classify_deny_bucket(tool_name: str, runtime_ctx: RuntimeContext) -> str:
     per-turn ``RuntimeContext`` — the runtime view is the authoritative
     input for this classification, not the persisted snapshot.
     """
+    # Extract short name for comparison with allowed_tools (which contains short names)
+    short_name = _extract_tool_short_name(tool_name)
+
     enabled_ids = runtime_ctx.enabled_skill_ids()
 
     if not enabled_ids:
         return "whitelist_violation"
 
     for sv in runtime_ctx.enabled_skills:
-        if tool_name in sv.metadata.allowed_tools:
+        if short_name in sv.metadata.allowed_tools:
             return "whitelist_violation"
         for stage in sv.metadata.stages or []:
-            if tool_name in stage.allowed_tools:
+            if short_name in stage.allowed_tools:
                 return "whitelist_violation"
 
     for skill_id, meta in runtime_ctx.all_skills_metadata.items():
         if not meta or skill_id in enabled_ids:
             continue
-        if tool_name in meta.allowed_tools:
+        if short_name in meta.allowed_tools:
             return "wrong_skill_tool"
         for stage in meta.stages or []:
-            if tool_name in stage.allowed_tools:
+            if short_name in stage.allowed_tools:
                 return "wrong_skill_tool"
 
     return "whitelist_violation"
@@ -311,7 +314,9 @@ def handle_pre_tool_use(input_data: dict[str, Any]) -> dict[str, Any]:
     ctx = _build_runtime_ctx(rt, state)
 
     # 3. Execute: gate check off the runtime view.
-    if tool_name in ctx.active_tools_set():
+    # Check short_name because active_tools contains short names for skill tools
+    # (e.g., "yuque_search") but full names for META_TOOLS (e.g., "mcp__tool-governance__list_skills")
+    if short_name in ctx.active_tools_set() or tool_name in ctx.active_tools_set():
         rt.store.append_audit(
             session_id, "tool.call", tool_name=tool_name, decision="allow"
         )

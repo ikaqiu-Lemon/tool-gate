@@ -1,0 +1,17 @@
+{
+  "session_id": "session-1777559548",
+  "start_time": "2026-04-30T14:32:28.624112+00:00",
+  "end_time": "2026-04-30T14:32:33.174663+00:00",
+  "duration_seconds": 4.550551,
+  "shown_skills": 1,
+  "read_skills": 1,
+  "enabled_skills": 1,
+  "denied_skills": 1,
+  "reason_missing_count": 0,
+  "total_tool_calls": 2,
+  "successful_tool_calls": 1,
+  "denied_tool_calls": 1,
+  "whitelist_violation_count": 1,
+  "blocked_tools_count": 0,
+  "stage_changes": 1
+}

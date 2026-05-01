@@ -1,0 +1,32 @@
+{
+  "session_id": "session-1777559548",
+  "skills_metadata": {},
+  "skills_loaded": {
+    "yuque-doc-edit": {
+      "skill_id": "yuque-doc-edit",
+      "version": "0.1.0",
+      "current_stage": "execution",
+      "last_used_at": null
+    }
+  },
+  "active_grants": {
+    "yuque-doc-edit": {
+      "grant_id": "dc669fe4-78fe-42c9-8e59-3c70b663af38",
+      "session_id": "session-1777559548",
+      "skill_id": "yuque-doc-edit",
+      "allowed_ops": [
+        "analyze",
+        "write_back"
+      ],
+      "scope": "session",
+      "ttl_seconds": 3600,
+      "status": "active",
+      "granted_by": "auto",
+      "reason": "将样例 01 的关联分析结果追加到 rag-overview-v2 文档的相关文档区块",
+      "created_at": "2026-04-30T14:32:31.138408",
+      "expires_at": "2026-04-30T15:32:31.138408"
+    }
+  },
+  "created_at": "2026-04-30T14:32:28.625024",
+  "updated_at": "2026-04-30T14:32:33.172964"
+}

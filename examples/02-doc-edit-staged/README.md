@@ -6,9 +6,114 @@
 
 ---
 
+## 快速开始
+
+### 一键运行
+
+```bash
+cd examples/02-doc-edit-staged
+./start_simulation.sh
+```
+
+### 查看日志
+
+```bash
+# 审计报告
+cat logs/session_*/audit_summary.md
+
+# 指标
+cat logs/session_*/metrics.json | jq .
+
+# 事件流
+cat logs/session_*/events.jsonl
+```
+
+### 重置环境
+
+```bash
+rm -rf .demo-data logs
+```
+
+---
+
+## 项目整体框架结构
+
+### 完整目录树
+
+```
+examples/02-doc-edit-staged/
+├── start_simulation.sh              # 【唯一入口】启动模拟
+├── README.md                        # 【完整文档】本文档
+├── .mcp.json                        # MCP 配置文件
+│
+├── scripts/                         # 脚本目录
+│   ├── agent_realistic_simulation.py  # Agent 主实现
+│   └── skill_handlers.py            # 技能动作处理器
+│
+├── skills/                          # 【活跃技能目录】当前可用的技能
+│   └── yuque-doc-edit/              # 语雀文档编辑技能
+│       └── SKILL.md                 # 技能定义（SOP + metadata + stages）
+│
+├── config/                          # 策略配置目录
+│   └── demo_policy.yaml             # 演示策略（require_reason + blocked_tools）
+│
+├── mcp/                             # Mock MCP 服务器目录
+│   ├── mock_yuque_stdio.py          # 模拟语雀 API
+│   └── mock_shell_stdio.py          # 模拟 Shell 命令（混杂变量工具）
+│
+├── schemas/                         # JSON Schema 定义目录
+│   ├── yuque_get_doc.schema.json
+│   ├── yuque_list_docs.schema.json
+│   ├── yuque_update_doc.schema.json
+│   └── run_command.schema.json
+│
+├── contracts/                       # 工具契约文档目录
+│   ├── yuque_tools_contract.md      # 语雀工具契约
+│   └── shell_tools_contract.md      # Shell 工具契约
+│
+├── .demo-data/                      # 【自动生成】运行时数据目录
+│   ├── governance.db                # SQLite 审计数据库
+│   └── session_state.json           # 会话状态持久化
+│
+└── logs/                            # 【自动生成】会话日志目录
+    └── session_{timestamp}/         # 每次运行生成一个会话目录
+        ├── events.jsonl             # JSONL 格式事件流
+        ├── audit_summary.md         # Markdown 格式审计报告
+        ├── metrics.json             # JSON 格式指标汇总
+        ├── state_before.json        # 会话开始时状态快照
+        └── state_after.json         # 会话结束时状态快照
+```
+
+### 目录说明
+
+#### 核心目录
+
+| 目录 | 用途 | 说明 |
+|------|------|------|
+| `scripts/` | Agent 实现 | 包含 Agent 主逻辑和技能处理器 |
+| `skills/` | 活跃技能 | 当前可被发现和启用的技能定义 |
+| `config/` | 策略配置 | 治理策略（require_reason、blocked_tools 等） |
+| `mcp/` | Mock 服务器 | 模拟外部 API 的 MCP 服务器实现 |
+
+#### 辅助目录
+
+| 目录 | 用途 | 说明 |
+|------|------|------|
+| `schemas/` | JSON Schema | 工具参数的 JSON Schema 定义（用于验证） |
+| `contracts/` | 工具契约 | Mock 工具的输入输出契约文档 |
+
+#### 自动生成目录
+
+| 目录 | 用途 | 说明 |
+|------|------|------|
+| `.demo-data/` | 运行时数据 | 包含审计数据库和会话状态，运行时自动创建 |
+| `logs/` | 会话日志 | 每次运行生成一个 `session_{timestamp}/` 子目录 |
+
+---
+
 ## 0. 业务背景与展示目标
 
-**业务背景**:样例 01 的关联报告出炉后,Alice 决定把"相关文档"区块**实际写回**一篇指定的文档。写回动作是中等风险,需要一个**明确的理由**(`require_reason`);并且写入前 Alice 想先看一眼原文避免覆盖别人的新修改。
+**业务背景**:样例 01 的关联报告出炉后,用户决定把"相关文档"区块**实际写回**一篇指定的文档。写回动作是中等风险,需要一个**明确的理由**(`require_reason`);并且写入前用户想先看一眼原文避免覆盖别人的新修改。
 
 **展示目标**:
 1. 证明中风险技能不带 `reason` 被拒,带上 `reason` 后进入 `analysis` 阶段
@@ -27,83 +132,93 @@
 
 ---
 
-## 2. 演示前置与启动
+## 2. 用户请求场景
 
-### 2.1 环境变量(两条路径都要导出)
+**用户请求**: "帮我把样例 01 输出的相关文档区块写回 rag-overview-v2"
 
-```bash
-cd examples/02-doc-edit-staged/
+**Agent 工作流程**:
+1. **发现技能**: 使用 `list_skills()` 列出可用技能
+2. **读取详情**: 使用 `read_skill("yuque-doc-edit")` 获取技能信息
+3. **尝试启用（无 reason）**: 使用 `enable_skill()` ❌ **被拒绝（reason_missing）**
+4. **重新启用（带 reason）**: 使用 `enable_skill(reason="...")` ✅ **成功，进入 analysis 阶段**
+5. **读取文档**: 使用 `yuque_get_doc()` 读取原文档内容
+6. **尝试写入（analysis 阶段）**: 尝试 `yuque_update_doc()` ❌ **被拒绝（不在 analysis 白名单）**
+7. **检查授权状态**: 使用 `grant_status()` 确认当前阶段
+8. **切换阶段**: 使用 `change_stage("execution")` 切换到执行阶段
+9. **写入文档（execution 阶段）**: 使用 `yuque_update_doc()` ✅ **成功写入**
+10. **尝试 shell 命令**: 尝试 `run_command()` ❌ **被拒绝（全局 blocked）**
+11. **提供结果**: 总结完成的工作和受限的操作
 
-export GOVERNANCE_DATA_DIR="$PWD/.demo-data"
-export GOVERNANCE_SKILLS_DIR="$PWD/skills"
-export GOVERNANCE_CONFIG_DIR="$PWD/config"
-```
+**预期治理行为**:
 
-三个 env var 的作用与缺失时的症状见 [`../QUICKSTART.md §1.3`](../QUICKSTART.md#13--三个-governance_-环境变量)。
-
-### 2.2 启动(两条路径,方式 B 首推)
-
-**方式 B · 离线子进程 replay**(零 API key,决策 stdout 可见;通用模板见 [`../QUICKSTART.md §3.1`](../QUICKSTART.md#31--方式-b--子进程-replayoffline--免-api-key))
-
-```bash
-# SessionStart:期望 stdout 含 additionalContext 列出 "Yuque Doc Edit (medium)"
-echo '{"event":"SessionStart","session_id":"02","cwd":"'"$PWD"'"}' | tg-hook
-
-# PreToolUse on run_command(全局 blocked_tools,始终拦截):期望 permissionDecision:"deny"
-echo '{"event":"PreToolUse","session_id":"02","tool_name":"run_command","tool_input":{}}' | tg-hook
-
-# PreToolUse on yuque_update_doc(未 enable + stage=analysis 未切换):期望 permissionDecision:"deny"
-echo '{"event":"PreToolUse","session_id":"02","tool_name":"yuque_update_doc","tool_input":{}}' | tg-hook
-```
-
-实测 stdout 见 §5.2。方式 B replay **不写审计**,完整审计链(`reason_missing` / `stage.change` / `blocked` bucket 区分)走方式 A。
-
-**方式 A · Claude Code CLI**(需 Anthropic API key;完整交互演示)
-
-```bash
-claude --plugin-dir ../../ --mcp-config ./.mcp.json
-```
-
-启动后按 §3 操作三列表逐行演示。链路概览见 [`../QUICKSTART.md §3.2`](../QUICKSTART.md#32--方式-a--claude-code-cli进阶需-anthropic-api-key--联网)。
+| 操作 | 阶段 | 结果 | 原因 |
+|------|------|------|------|
+| `enable_skill` (无 reason) | - | ❌ 拒绝 | require_reason=true |
+| `enable_skill` (带 reason) | - | ✅ 允许 | 进入 analysis 阶段 |
+| `yuque_get_doc` | analysis | ✅ 允许 | 在 analysis 白名单中 |
+| `yuque_update_doc` | analysis | ❌ 拒绝 | 不在 analysis 白名单中 |
+| `change_stage("execution")` | - | ✅ 允许 | 阶段切换 |
+| `yuque_update_doc` | execution | ✅ 允许 | 在 execution 白名单中 |
+| `run_command` | execution | ❌ 拒绝 | 全局 blocked_tools |
 
 ---
 
-## 3. 操作步骤
+## 3. 操作步骤详解
 
 | 时间戳 | 操作者输入 | 模型预期动作 | 系统侧事件 |
 |---|---|---|---|
-| 2026-04-19T11:15:00+08:00 | Alice:"帮我把样例 01 输出的相关文档区块写回 `rag-overview-v2`" | `read_skill("yuque-doc-edit")` | `UserPromptSubmit` 重算 `active_tools`;MCP `read_skill` 返回 SOP + 两阶段 `stages`;审计写 `skill.read risk=medium` |
-| 2026-04-19T11:15:08+08:00 | — | `enable_skill("yuque-doc-edit")`(**未带 reason**) | `PolicyEngine.evaluate` → `require_reason=true` 触发 `denied reason=reason_missing`;**不创建 grant**;审计写 `skill.enable decision=denied reason=reason_missing` |
-| 2026-04-19T11:15:15+08:00 | — | `enable_skill("yuque-doc-edit", reason="Append 相关文档区块到 rag-overview-v2,源自 01 的关联报告")` | `PolicyEngine.evaluate` → `granted`;创建 `Grant(scope=session, ttl=3600, stage=analysis)`;`active_tools` += `[yuque_get_doc, yuque_list_docs]`;审计写 `skill.enable granted_by=policy reason="..."` |
-| 2026-04-19T11:15:22+08:00 | — | `yuque_get_doc(doc_id="rag-overview-v2")` | `PreToolUse` allow(analysis 允许读);mock 返回最新正文;`PostToolUse` 审计 |
-| 2026-04-19T11:15:40+08:00 | — | `grant_status()` | 返回 `[{skill: yuque-doc-edit, stage: analysis, ttl_remaining: 3578, ...}]`;帮助模型确认当前能做什么 |
-| 2026-04-19T11:16:02+08:00 | — | `yuque_update_doc(doc_id="rag-overview-v2", body_markdown="...<新增区块>")` | `PreToolUse` **deny** → `additionalContext`:"`yuque_update_doc` 不在 stage `analysis` 的 `allowed_tools` 中;调用 `change_stage` 切到 `execution` 后再试";审计写 `tool.call whitelist_violation yuque_update_doc stage=analysis` |
-| 2026-04-19T11:16:08+08:00 | — | `change_stage("yuque-doc-edit", "execution")` | state 表更新 `stage=execution`;`ToolRewriter` 重算 → `active_tools` = `meta + yuque_get_doc + yuque_update_doc`;审计写 `stage.change analysis → execution` |
-| 2026-04-19T11:16:20+08:00 | — | `yuque_update_doc(doc_id="rag-overview-v2", body_markdown="...<新增区块>")` | `PreToolUse` allow;mock 返回 `{ok:true, version:5}`;`PostToolUse` 审计 `tool.call yuque_update_doc decision=allow stage=execution` |
-| 2026-04-19T11:16:38+08:00 | Alice(误试):"顺手用 shell 查一下磁盘占用" | `run_command(cmd="df -h")` | `PreToolUse` **deny** → `additionalContext`:"`run_command` 在全局 `blocked_tools` 列表中,任何技能都无法启用此工具";审计写 `tool.call run_command decision=deny reason=blocked` |
-| 2026-04-19T11:16:45+08:00 | Alice:"好的,不用 shell 了" | — | `UserPromptSubmit` 重算(无变化) |
-| 2026-04-19T11:17:10+08:00 | Alice:"再次确认一下现在我的权限" | `grant_status()` | 返回当前 `stage=execution`、TTL 剩余、`active_tools` 快照;用于 `error_bucket` 分析(若出现 deny 可对照) |
+| T+0s | `./start_simulation.sh` | — | `SessionStart` hook → 加载 state → `additionalContext` 注入技能目录 |
+| T+3s | "帮我把样例 01 输出的相关文档区块写回 rag-overview-v2" | `list_skills()` | `UserPromptSubmit` hook → 重算 `active_tools` |
+| T+9s | — | `read_skill("yuque-doc-edit")` | MCP `read_skill` 返回 SOP + stages + `risk_level: medium` |
+| T+16s | — | `enable_skill("yuque-doc-edit")`（未带 reason） | `PolicyEngine.evaluate` → `require_reason=true` → deny |
+| T+23s | — | `enable_skill("yuque-doc-edit", reason="...")`（带 reason） | `PolicyEngine.evaluate` → granted → 进入 analysis 阶段 |
+| T+30s | — | `yuque_get_doc(doc_id="rag-overview-v2")` | `PreToolUse` allow（analysis 允许读） |
+| T+37s | — | `yuque_update_doc(...)`（analysis 阶段） | `PreToolUse` deny（不在 analysis 白名单） |
+| T+44s | — | `grant_status()` | 返回当前阶段和 TTL 信息 |
+| T+51s | — | `change_stage("yuque-doc-edit", "execution")` | state 表更新 stage=execution，重算 active_tools |
+| T+58s | — | `yuque_update_doc(...)`（execution 阶段） | `PreToolUse` allow（在 execution 白名单） |
+| T+65s | — | `run_command(cmd="df -h")` | `PreToolUse` deny（全局 blocked_tools） |
 
 ---
 
 ## 4. 系统内部行为说明
 
-- **`require_reason` 分支**:`PolicyEngine.evaluate(skill, reason=None)` 当 `skill_policies.<skill>.require_reason=true` 时,短路返回 `decision=denied, reason=reason_missing`,**不生成 grant 也不扣减 TTL**。这是 `skill-authorization` 规范中的"reason 缺失即失败"不变量。
-- **Stage 过滤**:`ToolRewriter.compute_active_tools` 会根据 `state_manager.get_stage(skill_id)` 选择对应阶段的 `allowed_tools`;默认进入技能 `stages[0]`。`change_stage` 写入 state 表并**立即**触发下一次 rewrite(无需等下一轮 `UserPromptSubmit`)。
-- **`blocked_tools` 优先级**:策略评估顺序 = `global blocked → skill-specific policy → risk default`。因此即使某个 skill 的 `allowed_tools` 里写了 `run_command`,`ToolRewriter` 也会在最终合集前把它剔除;`PreToolUse` 看到时直接 deny,原因字段 = `blocked`(不是 `whitelist_violation`)。
-- **`grant_status` 的诊断价值**:该元工具返回 `active_tools` 快照 + 每个 grant 的 TTL/stage/reason。当模型被拒时,调一次 `grant_status` 能自己回答"我现在该怎么走下一步",这是 `error_bucket`(按拒绝原因分桶)与 `funnel/trace` 指标的上游输入。
+- **`require_reason` 分支**:`PolicyEngine.evaluate(skill, reason=None)` 当 `skill_policies.<skill>.require_reason=true` 时,短路返回 `decision=denied, reason=reason_missing`,**不生成 grant 也不扣减 TTL**。
+- **Stage 过滤**:`ToolRewriter.compute_active_tools` 会根据 `state_manager.get_stage(skill_id)` 选择对应阶段的 `allowed_tools`;默认进入技能 `stages[0]`。
+- **`blocked_tools` 优先级**:策略评估顺序 = `global blocked → skill-specific policy → risk default`。因此即使某个 skill 的 `allowed_tools` 里写了 `run_command`,`ToolRewriter` 也会在最终合集前把它剔除。
+- **`grant_status` 的诊断价值**:该元工具返回 `active_tools` 快照 + 每个 grant 的 TTL/stage/reason。当模型被拒时,调一次 `grant_status` 能自己回答"我现在该怎么走下一步"。
 
 ---
 
-## 5. 预期输出 / 日志 / 审计
+## 5. 预期输出与验证
 
-### 5.1 Audit 行形状
+### 5.1 预期指标
+
+```json
+{
+  "session_id": "session-{timestamp}",
+  "duration_seconds": 70.5,
+  "shown_skills": 1,
+  "read_skills": 1,
+  "enabled_skills": 1,
+  "denied_skills": 1,
+  "reason_missing_count": 1,
+  "total_tool_calls": 5,
+  "successful_tool_calls": 3,
+  "denied_tool_calls": 2,
+  "whitelist_violation_count": 1,
+  "blocked_tools_count": 1,
+  "stage_changes": 1
+}
+```
+
+### 5.2 审计日志形状
 
 ```
 created_at                         event                subject                                          meta
 2026-04-19T11:15:00+08:00          skill.read           skill=yuque-doc-edit                             risk=medium
 2026-04-19T11:15:08+08:00          skill.enable         skill=yuque-doc-edit                             decision=denied reason=reason_missing
-2026-04-19T11:15:15+08:00          skill.enable         skill=yuque-doc-edit                             decision=granted stage=analysis ttl=3600 reason="Append..."
+2026-04-19T11:15:15+08:00          skill.enable         skill=yuque-doc-edit                             decision=granted stage=analysis reason="..."
 2026-04-19T11:15:22+08:00          tool.call            tool=yuque_get_doc  stage=analysis               decision=allow
 2026-04-19T11:16:02+08:00          tool.call            tool=yuque_update_doc  stage=analysis           decision=deny reason=whitelist_violation
 2026-04-19T11:16:08+08:00          stage.change         skill=yuque-doc-edit  from=analysis to=execution
@@ -111,33 +226,18 @@ created_at                         event                subject                 
 2026-04-19T11:16:38+08:00          tool.call            tool=run_command                                 decision=deny reason=blocked
 ```
 
-### 5.2 关键拒绝 `additionalContext` 形状(Phase B 回填)
+### 5.3 验证命令
 
+```bash
+# 验证 JSONL 格式
+python3 -c "import json; [json.loads(line) for line in open('logs/session_*/events.jsonl')]"
+
+# 验证 JSON 格式
+python3 -c "import json; json.load(open('logs/session_*/metrics.json'))"
+
+# 查看审计数据库
+sqlite3 .demo-data/governance.db "SELECT * FROM audit_log ORDER BY created_at;"
 ```
-// reason_missing:
-"skill `yuque-doc-edit` requires a reason (policy.require_reason=true). Retry enable_skill with reason=\"...\"."
-
-// stage 不匹配:
-"tool `yuque_update_doc` is not allowed in stage `analysis`. Call change_stage(\"yuque-doc-edit\", \"execution\") first."
-
-// blocked_tools:
-"tool `run_command` is in global blocked_tools and cannot be enabled by any skill."
-```
-
-> **实测记录 · `tg-hook` 子进程退化路径(2026-04-21)**:
->
-> 方式:`cd examples/02-doc-edit-staged && GOVERNANCE_DATA_DIR=/tmp/tg-demo-02 GOVERNANCE_SKILLS_DIR=$PWD/skills GOVERNANCE_CONFIG_DIR=$PWD/config`,事件通过 `echo '{"event":"<Name>",...}' | tg-hook` 送入。
->
-> - **`SessionStart`** → `additionalContext` 列出 1 个中风险技能 `Yuque Doc Edit (medium)`,`SkillIndexer` 发现正常
-> - **`PreToolUse` `run_command`**(`blocked_tools` 列表项 + 未 enable)→ `{"permissionDecision":"deny","permissionDecisionReason":"Tool 'run_command' is not in active_tools. …"}`
-> - **`PreToolUse` `yuque_update_doc`**(未 enable)→ 同上形状
-> - **`governance.db.audit_log`** 新增 2 行 `tool.call / deny / error_bucket=whitelist_violation`
->
-> **差异**:`reason_missing` / `stage.change` / `blocked` bucket 需要走 `enable_skill` + `change_stage` 元工具链,子进程退化在未 enable 前所有拒绝都归 `whitelist_violation` 一类;§5.2 上方代码块的三类针对性 `additionalContext`(`reason_missing` / stage 不匹配 / `blocked_tools`)待 Claude CLI 交付现场补录。
-
-### 5.3 Verify(通用 SQL 见 QUICKSTART §4)
-
-按 [`../QUICKSTART.md §4`](../QUICKSTART.md#4--verify-通用套路) 的 SQL 模板查询 `$GOVERNANCE_DATA_DIR/governance.db`。**方式 A 完整跑完**时,期望看到 §5.1 列出的 8 行审计 —— 关键核验点:`skill.enable decision=denied reason=reason_missing` 先于 `skill.enable decision=granted`;`stage.change analysis → execution` 后 `tool.call yuque_update_doc stage=execution decision=allow`;`tool.call run_command decision=deny reason=blocked`(注意 `reason=blocked` 区别于白名单越界的 `whitelist_violation`)。**只跑方式 B** 时审计表为空或不存在是预期。
 
 ---
 
@@ -167,23 +267,158 @@ created_at                         event                subject                 
 
 ---
 
-## 8. Reset 与本 workspace 专属 troubleshooting
+## 8. Session Logging 实现
 
-### 8.1 Reset(跑第二次前清理 demo 状态)
+本样例实现了完整的会话日志记录，符合 `tool-gate/docs/session_logging_prompt.md` 规范。
+
+### 日志文件
+
+每次运行生成 `logs/session_{timestamp}/` 目录，包含:
+
+1. **events.jsonl** - JSONL 格式事件流
+   - 每行一个 JSON 对象
+   - 包含所有治理事件（skill.list, skill.read, skill.enable, tool.call, stage.change 等）
+   - 按时间戳排序
+
+2. **audit_summary.md** - Markdown 格式审计报告
+   - 基础信息（session_id, 时间, 工作目录）
+   - 用户请求
+   - Skill 暴露与读取漏斗
+   - 阶段切换统计
+   - 工具调用统计
+   - 工具调用明细表
+   - 治理效果分析
+   - 任务完成情况
+
+3. **metrics.json** - 结构化指标
+   - 会话时长
+   - Skill 漏斗指标（shown/read/enabled/denied）
+   - reason_missing 计数
+   - 工具调用指标（total/successful/denied）
+   - 白名单违规计数
+   - 全局阻止计数
+   - 阶段切换次数
+
+4. **state_before.json** - 会话开始时状态快照
+   - skills_metadata
+   - skills_loaded
+   - active_grants
+   - 时间戳
+
+5. **state_after.json** - 会话结束时状态快照
+   - 同上结构
+   - 反映会话结束时的最终状态
+
+### 记录的事件类型
+
+- `session.start` - 会话开始
+- `skill.list` - 列出技能
+- `skill.read` - 读取技能详情
+- `skill.enable` - 启用技能（包含决策：granted/denied 和 deny_reason）
+- `stage.change` - 阶段切换
+- `tool.call` - 工具调用（包含决策：allow/deny 和 error_bucket）
+- `agent.action` - Agent 动作（包含推理过程）
+- `agent.deliverable` - Agent 交付物
+- `session.end` - 会话结束
+
+---
+
+## 9. Reset 与 Troubleshooting
+
+### 9.1 Reset(跑第二次前清理 demo 状态)
 
 ```bash
 cd examples/02-doc-edit-staged/
-rm -rf ./.demo-data
+rm -rf ./.demo-data logs
 ```
 
-只删本 workspace 的 `.demo-data/`(含 `governance.db`);**不要触碰** `skills/`、`mcp/`、`schemas/`、`contracts/`、`config/`、`.mcp.json` —— 它们是演示资产本身。通用安全口径见 [`../QUICKSTART.md §5`](../QUICKSTART.md#5--reset-通用套路)。
+只删本 workspace 的 `.demo-data/` 和 `logs/`;**不要触碰** `skills/`、`mcp/`、`schemas/`、`contracts/`、`config/`、`.mcp.json` —— 它们是演示资产本身。
 
-### 8.2 本 workspace 专属 troubleshooting
-
-共性症状(pip 错目录、`tg-hook` 返回 `{}`、`GOVERNANCE_*` 未导出、`.mcp.json` 相对路径断裂等)见 [`../QUICKSTART.md §6`](../QUICKSTART.md#6--troubleshooting8-类常见启动失败)。本 workspace 独有症状如下:
+### 9.2 本 workspace 专属 troubleshooting
 
 | 症状 | 根因 | 验证 | 修复 |
 |---|---|---|---|
-| 第一次 `enable_skill("yuque-doc-edit")` 返回 `decision=denied reason=reason_missing`,像是"坏了" | 本 workspace 策略 `require_reason: true`;中风险技能必须带 `reason` 才能启用 —— 这是**预期行为**,不是失败 | 读 `config/demo_policy.yaml` 中 `skill_policies.yuque-doc-edit.require_reason` | 在 `enable_skill` 的第二次调用里传 `reason="..."` 参数;见 §3 时间戳 11:15:15 行 |
-| `change_stage("yuque-doc-edit","execution")` 之前 `yuque_update_doc` 被 `whitelist_violation` 拒,不是 `stage_mismatch` | 旧版 `error_bucket` 只分 `whitelist_violation` / `blocked` / `reason_missing` / `approval_required` 四类,stage 不匹配目前归类 `whitelist_violation`;文案会提示"stage=analysis" | 读 §5.1 倒数第 3 行 `tool.call whitelist_violation yuque_update_doc stage=analysis` | 调 `change_stage("yuque-doc-edit","execution")` 后重试;从 stdout 的 `additionalContext` 能看到 stage 切换提示 |
-| `run_command` 任何时候都被 deny,即使 `yuque-doc-edit` 已启用到 execution stage | `run_command` 在**全局** `blocked_tools` 列表(`config/demo_policy.yaml`),优先级高于任何 skill 授权 —— 这是 §4 "两层防线"第二层的预期;`reason` 字段 = `blocked`(不是 `whitelist_violation`) | §5.1 最后一行 `tool.call run_command decision=deny reason=blocked` | 不修;`run_command` 是本样例的混杂变量工具,永不放行;见 §6 "⚠️ 混杂变量"声明 |
+| 第一次 `enable_skill("yuque-doc-edit")` 返回 `decision=denied reason=reason_missing` | 本 workspace 策略 `require_reason: true`;中风险技能必须带 `reason` 才能启用 —— 这是**预期行为** | 读 `config/demo_policy.yaml` 中 `skill_policies.yuque-doc-edit.require_reason` | 在 `enable_skill` 的第二次调用里传 `reason="..."` 参数 |
+| `change_stage("yuque-doc-edit","execution")` 之前 `yuque_update_doc` 被拒 | stage 不匹配归类 `whitelist_violation`;文案会提示"stage=analysis" | 读审计日志中的 `tool.call whitelist_violation yuque_update_doc stage=analysis` | 调 `change_stage("yuque-doc-edit","execution")` 后重试 |
+| `run_command` 任何时候都被 deny | `run_command` 在**全局** `blocked_tools` 列表,优先级高于任何 skill 授权 —— 这是预期 | 审计日志最后一行 `tool.call run_command decision=deny reason=blocked` | 不修;`run_command` 是混杂变量工具,永不放行 |
+
+---
+
+## 10. 设计原则
+
+### Agent 无感知设计
+
+Agent 代码完全不知道自己在演示环境中运行:
+- ✅ 无 "simulation"、"mock"、"demo" 等字样
+- ✅ 类名为 `Agent`（不是 `SimulationAgent`）
+- ✅ Session ID 格式为 `session-{timestamp}`（不是 `demo-`、`test-`）
+- ✅ 所有输出消息都是自然语言（"任务完成" 而非 "模拟完成"）
+
+### 自然交互
+
+- 用户请求使用真实工作场景的语言
+- Agent 响应就像在帮助真实用户
+- 错误消息提供建设性指导
+- 日志记录完整的推理过程
+
+### 完整可观测性
+
+- 所有治理决策都有审计记录
+- 事件流可重放分析
+- 指标可量化评估
+- 状态快照可对比验证
+
+---
+
+## 11. 相关文档
+
+- [`../QUICKSTART.md`](../QUICKSTART.md) - 项目安装和快速入门
+- [`../../docs/session_logging_prompt.md`](../../docs/session_logging_prompt.md) - Session Logging 规范
+- [`contracts/yuque_tools_contract.md`](./contracts/yuque_tools_contract.md) - 语雀工具契约
+- [`contracts/shell_tools_contract.md`](./contracts/shell_tools_contract.md) - Shell 工具契约
+
+---
+
+## 附录：快速参考
+
+### 一行命令
+
+```bash
+# 运行
+./start_simulation.sh
+
+# 查看最新日志
+cat logs/session_*/audit_summary.md | tail -100
+
+# 验证
+python3 -c "import json; [json.loads(line) for line in open('logs/session_*/events.jsonl')]"
+
+# 重置
+rm -rf .demo-data logs
+```
+
+### 预期行为速查
+
+| 操作 | 阶段 | 结果 |
+|------|------|------|
+| enable_skill (无 reason) | - | ❌ 拒绝 |
+| enable_skill (带 reason) | - | ✅ 允许 |
+| yuque_get_doc | analysis | ✅ 允许 |
+| yuque_update_doc | analysis | ❌ 拒绝 |
+| change_stage | - | ✅ 允许 |
+| yuque_update_doc | execution | ✅ 允许 |
+| run_command | execution | ❌ 拒绝 |
+
+### 关键指标
+
+- **shown_skills**: 1
+- **read_skills**: 1
+- **enabled_skills**: 1
+- **denied_skills**: 1
+- **reason_missing_count**: 1
+- **total_tool_calls**: 5
+- **successful_tool_calls**: 3
+- **denied_tool_calls**: 2
+- **whitelist_violation_count**: 1
+- **blocked_tools_count**: 1
+- **stage_changes**: 1

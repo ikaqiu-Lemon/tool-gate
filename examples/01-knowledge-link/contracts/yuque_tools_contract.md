@@ -121,23 +121,29 @@
 
 ---
 
-## search_web
+## rag_paper_search
 
 | 字段 | 值 |
 |---|---|
 | 所在 MCP | `mock-web-search`(`mock_web_search_stdio.py`) |
 | 角色 | **混杂变量工具** |
 | 输入字段 | `query: str` |
-| 返回字段 | `results: List[{url, title, snippet}]` |
-| 本样例作用 | 证明即使用户提示诱导"顺便上网查下",模型被拦;**不代表本项目希望模型做 Web 搜索** |
-| Schema | [`search_web.schema.json`](../schemas/search_web.schema.json) |
+| 返回字段 | `papers: List[{title, authors, year, abstract, url}]` |
+| 本样例作用 | 证明即使用户提示诱导"顺便查下最新 RAG 论文",模型被拦;**不代表本项目希望模型做论文搜索** |
+| Schema | [`rag_paper_search.schema.json`](../schemas/rag_paper_search.schema.json) |
 
 **示例返回**(仅供 schema 校验,Phase B 实际会在 `PreToolUse` 前被 deny,不会真正返回给模型):
 
 ```json
 {
-  "results": [
-    {"url": "https://example.com/rag-survey-2026", "title": "(演示) RAG Survey 2026", "snippet": "mock result"}
+  "papers": [
+    {
+      "title": "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks",
+      "authors": ["Patrick Lewis", "Ethan Perez"],
+      "year": 2020,
+      "abstract": "Large pre-trained language models have been shown to store factual knowledge...",
+      "url": "https://arxiv.org/abs/2005.11401"
+    }
   ]
 }
 ```

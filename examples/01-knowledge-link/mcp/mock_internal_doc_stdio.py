@@ -3,7 +3,7 @@
 **混杂变量工具**。仅为制造真实工具混杂环境以验证 tool-gate 的拦截能力。
 此 MCP server **不代表**本项目支持内部 wiki 搜索业务,也不是任何主业务能力。
 
-在样例 01 中,search_doc 与 search_web 并列作为两个"另一种搜索源"同时注册,
+在样例 01 中,search_doc 与 rag_paper_search 并列作为两个"另一种搜索源"同时注册,
 目的是让 tool-gate 在多类搜索源同时存在时仍然只放行 SOP 声明的 yuque_search。
 """
 

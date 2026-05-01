@@ -502,7 +502,7 @@ Scaffolding  Core Logic   Plugin       Testing &
 
 ## Addendum — Delivery Demo Workspaces (`examples/`)
 
-**Source change**: `openspec/changes/add-delivery-demo-workspaces/`
+**Source change**: `openspec/changes/add-delivery-demo-workspaces/` *(archived 2026-04-21; directory removed 2026-05-01)*  
 **Phase A completion**: 2026-04-19
 
 Phase A produced three self-contained demo workspaces under `examples/`
@@ -516,6 +516,8 @@ Phase A deliverables: 3 workspace READMEs, 6 skeleton SKILL.md files, 3
 `demo_policy.yaml`, 3 `.mcp.json` (relative paths), 4 contract markdown
 files, and 16 JSON Schema files (Draft 2020-12, each with `input` +
 `output` subschemas). No Python, no core-code change.
+
+**Note**: The change directory was removed as part of `remove-legacy-delivery-demo-changes` cleanup (2026-05-01). All requirements from this change have been migrated to `openspec/specs/delivery-demo-harness/`. The demo workspaces remain fully functional under `examples/`.
 
 Phase B (future change) will implement `mock_*_stdio.py` servers per the
 contract tables and schema files, then backfill measured stdout /
@@ -653,7 +655,7 @@ Deferred to a follow-up change (not archived with this one):
 
 ## Addendum — Demo Workspace Onboarding Hardening (`harden-demo-workspace-onboarding`)
 
-**Source change**: `openspec/changes/harden-demo-workspace-onboarding/`
+**Source change**: `openspec/changes/harden-demo-workspace-onboarding/` *(directory removed 2026-05-01)*  
 **Completion**: Stages A–D 2026-04-21 (docs-only; no governance core touched)
 
 Narrow-scope documentation hardening targeting zero-knowledge readers of
@@ -679,6 +681,8 @@ Deliverables:
   `§4` system behavior, `§5.1` audit rows, `§5.2` 실측 record,
   `§6` contract table, and `§7` code anchors preserved verbatim.
 - `scripts/check-demo-env.sh` (new) — POSIX-sh preflight that checks
+
+**Note**: The change directory was removed as part of `remove-legacy-delivery-demo-changes` cleanup (2026-05-01). All requirements from this change have been migrated to `openspec/specs/delivery-demo-harness/`. The onboarding improvements remain in place under `examples/`.
   Python 3.11+, `tg-hook` / `tg-mcp` / `claude` on PATH, per-workspace
   `.mcp.json` JSON validity, and `mcp/*.py` syntactic validity.
   Outputs ✅/⚠️/❌; exits non-zero only on ❌.

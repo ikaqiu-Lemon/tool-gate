@@ -6,6 +6,47 @@
 
 ---
 
+## 项目结构
+
+```
+examples/03-lifecycle-and-risk/
+├── README.md                          # 本文档
+├── start_simulation.sh                # 统一入口脚本
+├── .mcp.json                          # MCP 服务器配置
+├── config/                            # 策略配置
+│   └── demo_policy.yaml              # 演示策略(TTL/风险等级/blocked_tools)
+├── skills/                            # 技能定义
+│   ├── yuque-knowledge-link/         # 低风险技能(TTL=120s)
+│   ├── yuque-doc-edit/               # 中风险技能
+│   └── yuque-bulk-delete/            # 高风险技能(approval_required)
+├── skills_incoming/                   # 待加载技能(refresh_skills 演示用)
+│   └── yuque-comment-sync/
+├── mcp/                               # Mock MCP 服务器
+│   └── mock_yuque_stdio.py           # 模拟语雀工具
+├── schemas/                           # 工具 schema 定义
+├── contracts/                         # 工具契约文档
+│   └── yuque_tools_contract.md
+├── scripts/                           # 模拟脚本
+│   ├── agent_realistic_simulation.py # Agent 模拟主程序
+│   └── skill_handlers.py             # 技能操作处理器
+└── logs/                              # 会话日志输出目录
+    └── session_*/                     # 按会话 ID 组织的日志
+        ├── events.jsonl               # 事件流
+        ├── audit_summary.md           # 审计报告
+        ├── metrics.json               # 指标汇总
+        ├── state_before.json          # 会话前状态
+        └── state_after.json           # 会话后状态
+```
+
+### 核心组件说明
+
+- **start_simulation.sh**: 统一入口，设置环境变量并启动 agent 模拟
+- **agent_realistic_simulation.py**: 模拟用户与 agent 交互，演示完整的生命周期管理流程
+- **skill_handlers.py**: 注册技能操作处理器，处理 `relate`、`update`、`delete_batch` 等操作
+- **logs/**: 自动生成的会话日志，包含完整的审计追踪和指标分析
+
+---
+
 ## 0. 业务背景与展示目标
 
 **业务背景**:Alice 下午继续工作,会话已经开了几个小时。早上启用的 `yuque-knowledge-link`(short TTL = 120s)应该早就过期;她顺手还把 `yuque-doc-edit` 也启用着。现在她要清理权限、并尝试一个危险操作(批量删除过期文档)——这个操作预期会被 tool-gate 拦两层:高风险策略审批 + 全局 `blocked_tools`。
@@ -45,7 +86,21 @@ export GOVERNANCE_CONFIG_DIR="$PWD/config"
 
 三个 env var 的作用与缺失时的症状见 [`../QUICKSTART.md §1.3`](../QUICKSTART.md#13--三个-governance_-环境变量)。
 
-### 2.2 启动(两条路径,方式 B 首推)
+### 2.2 启动(三种方式)
+
+**方式 C · 自动化模拟**(推荐,零 API key,完整审计日志)
+
+```bash
+./start_simulation.sh
+```
+
+这是**推荐方式**，会自动运行完整的生命周期演示场景，生成结构化日志到 `logs/` 目录。模拟脚本会：
+1. 检查权限状态
+2. 尝试使用过期工具并重新启用
+3. 演示 disable_skill 的 revoke → disable 顺序
+4. 尝试启用高风险技能(被 approval_required 拦截)
+5. 尝试调用被全局阻止的工具(被 blocked_tools 拦截)
+6. 生成完整的审计报告和指标
 
 **方式 B · 离线子进程 replay**(零 API key,决策 stdout 可见;通用模板见 [`../QUICKSTART.md §3.1`](../QUICKSTART.md#31--方式-b--子进程-replayoffline--免-api-key))
 
@@ -61,7 +116,7 @@ echo '{"event":"PreToolUse","session_id":"03","tool_name":"yuque_delete_doc","to
 echo '{"event":"PreToolUse","session_id":"03","tool_name":"yuque_search","tool_input":{}}' | tg-hook
 ```
 
-实测 stdout 见 §5.2。方式 B replay **不写审计**,完整生命周期链(TTL 到期 / `grant.revoke` / `skill.disable` / `approval_required`)走方式 A。
+实测 stdout 见 §5.2。方式 B replay **不写审计**,完整生命周期链(TTL 到期 / `grant.revoke` / `skill.disable` / `approval_required`)走方式 A 或方式 C。
 
 **方式 A · Claude Code CLI**(需 Anthropic API key;完整交互演示)
 
@@ -84,19 +139,79 @@ claude --plugin-dir ../../ --mcp-config ./.mcp.json
 
 ## 3. 操作步骤(主线)
 
-| 时间戳 | 操作者输入 | 模型预期动作 | 系统侧事件 |
+> **注意**: 下表中的"操作者输入"在自动化模拟中已被转换为 agent 的内部推理过程。模拟脚本不会让 agent 知道这是一个模拟场景，agent 会认为自己在真实地帮助用户完成任务。
+
+| 时间戳 | 用户场景 | Agent 预期动作 | 系统侧事件 |
 |---|---|---|---|
-| 2026-04-19T14:00:00+08:00 | Alice 继续之前的会话 | `grant_status()` | `UserPromptSubmit` → `cleanup_expired_grants` 发现 `yuque-knowledge-link` 已过期;返回当前仅剩 `yuque-doc-edit`(execution);审计已有 `grant.expire yuque-knowledge-link at=10:34:31+08:00` |
-| 2026-04-19T14:00:07+08:00 | Alice:"再查一次早上那批 RAG 笔记有没有新的" | `yuque_search(query="RAG")` | `PreToolUse` **deny** → `additionalContext`:"`yuque_search` 不在当前 `active_tools`;已过期技能 `yuque-knowledge-link` 需要重新 `enable_skill`";审计写 `tool.call whitelist_violation yuque_search reason=expired_skill` |
-| 2026-04-19T14:00:14+08:00 | — | `read_skill("yuque-knowledge-link")` → `enable_skill("yuque-knowledge-link")` | `PolicyEngine.evaluate` → `max_ttl=120` 适用;新的 `Grant` 创建 TTL=120;`active_tools` 重新追加 3 个 yuque 只读工具;审计写 `skill.enable granted_by=auto ttl=120` |
-| 2026-04-19T14:00:30+08:00 | Alice:"算了,这批的权限清掉吧,今天先不搞了" | `disable_skill("yuque-doc-edit")` | `GrantManager.revoke_grant` → 审计写 `grant.revoke yuque-doc-edit`;然后 `StateManager.unload_skill` → 审计写 `skill.disable yuque-doc-edit`;**顺序严格:revoke 先,disable 后**;`active_tools` 去除 `yuque_update_doc` 与 execution stage 的其它工具 |
-| 2026-04-19T14:00:35+08:00 | Alice:"顺手把过期的冗余文档批量删了吧" | `read_skill("yuque-bulk-delete")` | 返回 `risk_level: high`、`allowed_tools: [yuque_list_docs, yuque_delete_doc]`;审计写 `skill.read risk=high` |
-| 2026-04-19T14:00:42+08:00 | — | `enable_skill("yuque-bulk-delete", reason="清理 2024 年之前的过期笔记")` | `PolicyEngine.evaluate` → `skill_policies.yuque-bulk-delete.approval_required=true` → `decision=denied reason=approval_required`;审计写 `skill.enable decision=denied reason=approval_required` |
-| 2026-04-19T14:00:50+08:00 | Alice(假设路径):"那走管理员通道强启用了" | (假设审批通过)`yuque-bulk-delete` 已启用 → `yuque_delete_doc(doc_id="old-2023")` | 即便跳过 approval,`yuque_delete_doc` 仍在 `blocked_tools` 中 → `PreToolUse` **deny** → `additionalContext`:"`yuque_delete_doc` 在全局 `blocked_tools`,与 skill 的授权状态无关";审计写 `tool.call yuque_delete_doc decision=deny reason=blocked` |
-| 2026-04-19T14:01:00+08:00 | Alice:"好吧我放弃这条路,改手动清" | `grant_status()` | 返回当前仅剩 `yuque-knowledge-link`(ttl_remaining ≈ 90s);用于给 Alice 做能力盘点 |
-| 2026-04-19T14:02:15+08:00 | (等待 ~90s 后)Alice 继续看文档 | `yuque_search(query="RAG")` | 第二次 TTL 过期 + `UserPromptSubmit` 重算 → `yuque_search` 再次被拦;审计写 `grant.expire yuque-knowledge-link` 的第二行 |
+| 会话开始 | 用户继续之前的会话 | `grant_status()` | `UserPromptSubmit` → `cleanup_expired_grants` 发现 `yuque-knowledge-link` 已过期;返回当前仅剩 `yuque-doc-edit`(execution);审计已有 `grant.expire yuque-knowledge-link at=10:34:31+08:00` |
+| +7s | 用户:"再查一次早上那批 RAG 笔记有没有新的" | `yuque_search(query="RAG")` | `PreToolUse` **deny** → `additionalContext`:"`yuque_search` 不在当前 `active_tools`;已过期技能 `yuque-knowledge-link` 需要重新 `enable_skill`";审计写 `tool.call whitelist_violation yuque_search reason=expired_skill` |
+| +14s | — | `read_skill("yuque-knowledge-link")` → `enable_skill("yuque-knowledge-link")` | `PolicyEngine.evaluate` → `max_ttl=120` 适用;新的 `Grant` 创建 TTL=120;`active_tools` 重新追加 3 个 yuque 只读工具;审计写 `skill.enable granted_by=auto ttl=120` |
+| +30s | 用户:"算了,这批的权限清掉吧,今天先不搞了" | `disable_skill("yuque-doc-edit")` | `GrantManager.revoke_grant` → 审计写 `grant.revoke yuque-doc-edit`;然后 `StateManager.unload_skill` → 审计写 `skill.disable yuque-doc-edit`;**顺序严格:revoke 先,disable 后**;`active_tools` 去除 `yuque_update_doc` 与 execution stage 的其它工具 |
+| +35s | 用户:"顺手把过期的冗余文档批量删了吧" | `read_skill("yuque-bulk-delete")` | 返回 `risk_level: high`、`allowed_tools: [yuque_list_docs, yuque_delete_doc]`;审计写 `skill.read risk=high` |
+| +42s | — | `enable_skill("yuque-bulk-delete", reason="清理 2024 年之前的过期笔记")` | `PolicyEngine.evaluate` → `skill_policies.yuque-bulk-delete.approval_required=true` → `decision=denied reason=approval_required`;审计写 `skill.enable decision=denied reason=approval_required` |
+| +50s | 用户(假设路径):"那走管理员通道强启用了" | (假设审批通过)`yuque-bulk-delete` 已启用 → `yuque_delete_doc(doc_id="old-2023")` | 即便跳过 approval,`yuque_delete_doc` 仍在 `blocked_tools` 中 → `PreToolUse` **deny** → `additionalContext`:"`yuque_delete_doc` 在全局 `blocked_tools`,与 skill 的授权状态无关";审计写 `tool.call yuque_delete_doc decision=deny reason=blocked` |
+| +60s | 用户:"好吧我放弃这条路,改手动清" | `grant_status()` | 返回当前仅剩 `yuque-knowledge-link`(ttl_remaining ≈ 90s);用于给用户做能力盘点 |
+| +135s | (等待 ~90s 后)用户继续看文档 | `yuque_search(query="RAG")` | 第二次 TTL 过期 + `UserPromptSubmit` 重算 → `yuque_search` 再次被拦;审计写 `grant.expire yuque-knowledge-link` 的第二行 |
 
 ### 附录(辅助复核)· `refresh_skills` 打点
+
+> 主场景见[样例 01](../01-knowledge-link/README.md#附录--refresh_skills-插曲)。此处仅为让功能/接口矩阵的 `refresh_skills: 03=●` 有实际打点,不承担剧情。
+
+| 时间戳 | 用户场景 | Agent 预期动作 | 系统侧事件 |
+|---|---|---|---|
+| 后台操作 | (后台)拷 `skills_incoming/yuque-comment-sync` 到 `skills/` | — | 目录变化但尚未 refresh |
+| +3s | — | `refresh_skills()` | `SkillIndexer.build_index()` 执行一次;返回 `{count: 4}`(原 3 + 新 1);审计写 `skills.index.refresh count=4 single_scan=true` |
+
+---
+
+## 9. 会话日志说明
+
+运行 `./start_simulation.sh` 后，会在 `logs/session_<timestamp>/` 目录下生成以下文件：
+
+### 9.1 events.jsonl
+每行一个 JSON 事件，按时间顺序记录：
+- `session.start` / `session.end` - 会话生命周期
+- `skill.list` / `skill.read` / `skill.enable` / `skill.disable` - 技能操作
+- `tool.call` - 工具调用及治理决策
+- `grant.expire` / `grant.revoke` - 权限生命周期
+- `agent.action` / `agent.deliverable` - Agent 行为追踪
+
+### 9.2 audit_summary.md
+人类可读的审计报告，包含：
+- 基础信息（会话 ID、时长、工作目录）
+- 用户请求摘要
+- Skill 生命周期管理统计
+- 工具调用明细表
+- 治理效果评估
+- 任务完成情况分析
+
+### 9.3 metrics.json
+结构化指标汇总：
+```json
+{
+  "session_id": "session-1234567890",
+  "duration_seconds": 45.2,
+  "enabled_skills": 2,
+  "disabled_skills": 1,
+  "total_tool_calls": 6,
+  "denied_tool_calls": 2,
+  "whitelist_violation_count": 1,
+  "blocked_tool_count": 1,
+  "grant_expire_count": 1,
+  "grant_revoke_count": 1
+}
+```
+
+### 9.4 state_before.json / state_after.json
+会话前后的状态快照，包含：
+- `skills_metadata` - 技能元数据
+- `skills_loaded` - 已加载技能
+- `active_grants` - 活跃授权
+- `created_at` / `updated_at` - 时间戳
+
+这些日志文件遵循 [`/home/zh/tool-gate/docs/session_logging_prompt.md`](../../docs/session_logging_prompt.md) 中定义的规范。
+
+---
 
 > 主场景见[样例 01](../01-knowledge-link/README.md#附录--refresh_skills-插曲)。此处仅为让功能/接口矩阵的 `refresh_skills: 03=●` 有实际打点,不承担剧情。
 
@@ -214,6 +329,6 @@ rm -rf ./.demo-data
 | 症状 | 根因 | 验证 | 修复 |
 |---|---|---|---|
 | §3 14:00:00+08:00 那一行期望 `grant.expire yuque-knowledge-link` 已经发生,实际 `grant_status` 仍显示 `yuque-knowledge-link` 未过期 | 现场演示没跑足够长的时间窗口 —— `max_ttl=120` 默认值下必须等 120s;或时间推进方案未生效 | `grant_status()` 返回的 `ttl_remaining` 是否 `> 0` | 按 §2.3 方案 A 切 `demo_policy.fast.yaml`(Stage D 落地后)或方案 B 手工改 `max_ttl: 5` 并 `sleep 6` |
-| `disable_skill("yuque-doc-edit")` 后审计表里 `skill.disable` 行在 `grant.revoke` **之前**出现 | D7 顺序违规,代表实现端问题(不应在 demo 路径发生) | `SELECT created_at, event, skill_id FROM audit WHERE event IN ('grant.revoke','skill.disable') AND skill_id='yuque-doc-edit' ORDER BY created_at;` | 这是实现回归,**不属于 demo 使用问题**;归档前请反馈给 `add-delivery-demo-workspaces` 或核心维护 |
+| `disable_skill("yuque-doc-edit")` 后审计表里 `skill.disable` 行在 `grant.revoke` **之前**出现 | D7 顺序违规,代表实现端问题(不应在 demo 路径发生) | `SELECT created_at, event, skill_id FROM audit WHERE event IN ('grant.revoke','skill.disable') AND skill_id='yuque-doc-edit' ORDER BY created_at;` | 这是实现回归,**不属于 demo 使用问题**;请反馈给核心维护 |
 | `yuque_delete_doc` 被 deny,看到原因 `whitelist_violation` 而非 `blocked` | 演示者没走"假设路径强启用 bulk-delete"那一步;未 enable 时 deny 归 `whitelist_violation` 是正常;`blocked` 只有在 `yuque-bulk-delete` 已 enable 的情况下才会被兜底拦 | §5.1 最后一行 `tool.call yuque_delete_doc decision=deny reason=blocked` 需要走管理员通道假设启用,才是两层防线第二层展示 | 按 §3 14:00:50 行的**假设路径**注释:即便跳过 `approval_required` 把 skill 强启用,`blocked_tools` 仍兜底拦;若仅演示第一层,止步于 `approval_required` deny 即可 |
 | `refresh_skills` 附录(§3 附录 14:05:03)被当成主线,读者以为是 01 的 refresh 情节 | 03 主线**不包含** `refresh_skills`;附录仅为让功能矩阵的"03 列 refresh_skills=●"有实际打点;主场景在 [01 的附录](../01-knowledge-link/README.md#附录--refresh_skills-插曲) | 看 §0 开头粗体提示,以及附录的引言 | 直接跳过附录;主线验收只看 §3 主表 |

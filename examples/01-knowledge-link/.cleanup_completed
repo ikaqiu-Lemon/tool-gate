@@ -1,0 +1,47 @@
+================================================================================
+清理完成时间: 2026-04-30 13:06
+================================================================================
+
+✅ 已删除的文件（16 项）:
+
+自动生成的文件:
+  - .demo-data/
+  - logs/
+  - governance.db
+  - __pycache__/
+  - reports/
+
+废弃的入口:
+  - agent
+  - scripts/RUN_SIMULATION.sh
+
+可选脚本:
+  - verify_setup.sh
+  - scripts/demo_script.py
+
+已整合的文档:
+  - QUICKSTART.md
+  - AGENT_SETUP.md
+  - CHANGES_SUMMARY.md
+  - QUICKREF.md
+  - CLEANUP_GUIDE.md
+  - COMPLETION_SUMMARY.md
+  - FINAL_SUMMARY.txt
+
+✅ 保留的必备文件（9 项）:
+
+  1. start_simulation.sh              - 唯一入口
+  2. README.md                        - 完整文档（18KB）
+  3. .mcp.json                        - MCP 配置
+  4. scripts/agent_realistic_simulation.py
+  5. scripts/skill_handlers.py
+  6. skills/                          - 技能定义目录
+  7. config/                          - 策略配置目录
+  8. mcp/                             - Mock MCP 服务器目录
+  9. contracts/                       - 工具契约文档目录
+
+✅ 现在可以从头开始运行:
+
+  ./start_simulation.sh
+
+================================================================================

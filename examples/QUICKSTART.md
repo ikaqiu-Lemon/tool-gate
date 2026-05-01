@@ -125,19 +125,21 @@ echo '{"event":"SessionStart","session_id":"qs-demo","cwd":"'"$PWD"'"}' | tg-hoo
 
 关键字段 `additionalContext` 把当前可见技能目录注入 Claude 上下文。
 
-**示例 2 · PreToolUse 被拦(白名单外工具)**
+**示例 2 · PreToolUse 被拦(授权前必攔)**
+
+> 💡 **Deny 是预期行为**:在未调 `enable_skill` 启用特定技能前,tool-gate 严格遵循"默认拒绝"原则。本路径演示即便你此时还没有用过 Claude 模型一次,非法工具调用也会被真实拦截。
 
 ```bash
-echo '{"event":"PreToolUse","session_id":"qs-demo","tool_name":"search_web","tool_input":{}}' | tg-hook
+echo '{"event":"PreToolUse","session_id":"qs-demo","tool_name":"yuque_search","tool_input":{}}' | tg-hook
 ```
 
 **期望 stdout 形状(实测)**:
 
 ```json
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Tool 'search_web' is not in active_tools. Please use read_skill and enable_skill to authorize the required skill first.","additionalContext":"To use this tool, first discover available skills with list_skills, then read_skill to understand the workflow, then enable_skill to authorize."}}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Tool 'yuque_search' is not in active_tools. ...","additionalContext":"To use this tool, first discover available skills with list_skills, then read_skill to understand the workflow, then enable_skill to authorize."}}
 ```
 
-看到 `permissionDecision: "deny"` 即代表 tool-gate 的拦截链路已跑通。**此时你还没有用过 Claude 模型一次**。
+看到 `permissionDecision: "deny"` 即代表 tool-gate 的拦截链路已跑通。如果要看到 `allow`,需要走方式 A 完成真实交互。
 
 > ⚠️ **诚实划界**:`tg-hook` 子进程 replay 产出 **stdout 决策**,但**不会把事件写入** `governance.db` 的审计表(schema 初始化由 `tg-mcp` / Claude CLI harness 驱动,不在 hook 重放路径内)。要看到完整审计链,走方式 A(§3.2)。§4 verify 的 SQL 在只跑方式 B 的环境下会看到空表或仅文件存在,这是预期。
 >
@@ -202,7 +204,7 @@ rm -rf ./.demo-data
 | T-8 | 01 附录 `refresh_skills` 插曲后,`list_skills` 仍看不到新技能 | `skills_incoming/` 只是文档约定,必须**手动** `cp -r skills_incoming/yuque-comment-sync skills/`,再调 `refresh_skills()` | `ls examples/01-*/skills/` 是否含 `yuque-comment-sync` | 拷贝目录 → 再调 `refresh_skills`;两步顺序不能反 |
 | T-9 | `tg-hook` 对合法事件返回 `{}` 而非 `permissionDecision` | 用了 `hook_event_name` 而不是 `event`。`tg-hook` 源码明确读 `"event"`;Claude Code harness 默认 envelope 是 `"hook_event_name"`,子进程 replay 需要**重命名字段** | 复制 §3.1 示例 1 的命令,把 JSON 中的 `"event"` 改回 `"hook_event_name"` 再重放 —— 应看到 `{}` | 把 JSON 键改回 `"event": "SessionStart"` 等 |
 
-> ⚠️ **对根 `examples/README.md §5.1` 的警示**:该节给出的子进程 replay 示例使用了 `hook_event_name` 字段名,**未经实测**(该节也自述"Phase B 会追加实测 stdout 段"未兑现)。其 stdout 形状承诺不应作为 tool-gate 可观察 deny/allow 的基线。以本 QUICKSTART §3.1 实测形状为准。该问题属于 `add-delivery-demo-workspaces` change 的产物,本 change 范围内不修改根 README §5.1。
+> ⚠️ **对根 `examples/README.md §5.1` 的警示**: 该节给出的子进程 replay 示例使用了 `hook_event_name` 字段名，**未经实测**（该节也自述"Phase B 会追加实测 stdout 段"未兑现）。其 stdout 形状承诺不应作为 tool-gate 可观察 deny/allow 的基线。以本 QUICKSTART §3.1 实测形状为准。*(历史遗留问题，不影响当前使用)*
 
 ---
 

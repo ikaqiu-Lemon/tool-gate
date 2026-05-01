@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "examples/01-knowledge-link/schemas/rag_paper_search.schema.json",
+  "title": "rag_paper_search contract (confounder tool; never passes PreToolUse in this example)",
+  "type": "object",
+  "required": ["input", "output"],
+  "properties": {
+    "input": {
+      "type": "object",
+      "required": ["query"],
+      "additionalProperties": false,
+      "properties": {
+        "query": {"type": "string", "minLength": 1}
+      }
+    },
+    "output": {
+      "type": "object",
+      "required": ["papers"],
+      "additionalProperties": false,
+      "properties": {
+        "papers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["title", "authors", "year", "abstract", "url"],
+            "additionalProperties": false,
+            "properties": {
+              "title":    {"type": "string"},
+              "authors":  {"type": "array", "items": {"type": "string"}},
+              "year":     {"type": "integer"},
+              "abstract": {"type": "string"},
+              "url":      {"type": "string", "format": "uri"}
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -6,7 +6,7 @@
 
 > 面向交付评审人 / 二次开发者。每个样例是一个**独立 demo workspace**,演示时 `cd` 进入该样例目录即可启动 Claude Code。
 >
-> 本目录是 change `add-delivery-demo-workspaces` 的 Phase A 产出:仅包含文档、技能骨架、策略、契约和 JSON Schema。**mock MCP 的 Python 实现属于 Phase B**。
+> 本目录包含三个完整的 demo workspaces，展示 tool-gate 的核心治理能力。规范要求详见 `openspec/specs/delivery-demo-harness/`。
 
 ---
 
@@ -132,7 +132,7 @@ echo '{"hook_event_name":"PreToolUse","session_id":"demo","tool_name":"search_we
 - 每个 `*.schema.json` 合法 JSON(Draft 2020-12)且含 `input` + `output` 双子 schema
 - 6 份 `SKILL.md` 能被 `SkillIndexer` 扫到
 
-详见 `openspec/changes/add-delivery-demo-workspaces/tasks.md` §9。
+详见 `openspec/specs/delivery-demo-harness/spec.md` 中的相关 requirements。
 
 > 更完整的排障矩阵(pip 错目录、`tg-hook` 返回 `{}`、`GOVERNANCE_*` 未导出、`.mcp.json` 相对路径断裂等 8+ 类)见 [`QUICKSTART.md §6`](./QUICKSTART.md#6--troubleshooting8-类常见启动失败)。
 
@@ -140,11 +140,10 @@ echo '{"hook_event_name":"PreToolUse","session_id":"demo","tool_name":"search_we
 
 ## 6. 相关文档
 
-- `openspec/changes/add-delivery-demo-workspaces/proposal.md`:本 change 的动机与范围
-- `openspec/changes/add-delivery-demo-workspaces/design.md`:目录、模板、矩阵、契约 / schema 的设计决策
-- `openspec/changes/add-delivery-demo-workspaces/specs/delivery-demo-harness/spec.md`:验收要求
-- `docs/refer/yuque-eco-system.md`:演示业务故事的参考来源
-- `README_CN.md`:项目整体概览
+- **`openspec/specs/delivery-demo-harness/spec.md`**: Demo workspace 规范要求（canonical）
+- **`QUICKSTART.md`**: 零知识读者入门指南（安装、启动、verify、reset、troubleshooting）
+- `docs/refer/yuque-eco-system.md`: 演示业务故事的参考来源
+- `README_CN.md`: 项目整体概览
 
 ---
 

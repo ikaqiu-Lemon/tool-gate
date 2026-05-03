@@ -43,9 +43,9 @@
 *上下文守则*:只打开 rewriter + composer + 它们的单测。
 
 - [x] 3.1 新增 `tool_rewriter.compute_active_tools(runtime_ctx) -> list[str]` 纯函数
-- [ ] 3.2 保留 `tool_rewriter.recompute_active_tools(state)` 为 thin adapter:内部委托 `compute_active_tools` 后把结果赋回 `state.active_tools`,并发出 `DeprecationWarning` *(deferred to next change / see closeout backlog #3 — gated on MCP/LangChain migration to avoid production log noise)*
+- [x] 3.2 保留 `tool_rewriter.recompute_active_tools(state)` 为 thin adapter:内部委托 `compute_active_tools` 后把结果赋回 `state.active_tools`,并发出 `DeprecationWarning` *(completed in migrate-entrypoints-to-runtime-flow Stage C — archived 2026-04-30)*
 - [x] 3.3 `prompt_composer.compose_context / compose_skill_catalog / compose_active_tools_prompt` 新增接收 `RuntimeContext` 的版本(纯函数);旧 `(state)` 签名保留为 thin adapter + `DeprecationWarning`
-- [ ] 3.4 `tests/test_tool_rewriter.py` 将"就地修改 state"断言迁移为"`compute_active_tools` 返回值正确 + runtime_ctx / state 均未被修改" *(deferred to next change / see closeout backlog #3 — moves with the DeprecationWarning on `recompute_active_tools`)*
+- [x] 3.4 `tests/test_tool_rewriter.py` 将"就地修改 state"断言迁移为"`compute_active_tools` 返回值正确 + runtime_ctx / state 均未被修改" *(completed in migrate-entrypoints-to-runtime-flow Stage C — archived 2026-04-30)*
 - [x] 3.5 运行 `pytest tests/test_tool_rewriter.py -q` 通过
 
 ---
@@ -60,7 +60,7 @@
 - [x] 3.7 `hook_handler.handle_user_prompt_submit` 改四步
 - [x] 3.8 `hook_handler.handle_pre_tool_use` 改四步(gate-check 只消费 runtime view,**不**回写 state)
 - [x] 3.9 `hook_handler.handle_post_tool_use` 改四步(`last_used_at` 写入 `skills_loaded`,仍属 persisted-only)
-- [ ] 3.10 `mcp_server` 的 `list_skills` / `read_skill` / `enable_skill` / `disable_skill` / `grant_status` / `run_skill_action` / `change_stage` / `refresh_skills` 逐个切四步流程 *(deferred to next change / see closeout backlog #2 — MCP / LangChain entry-point migration is explicitly out of scope for this change)*
+- [x] 3.10 `mcp_server` 的 `list_skills` / `read_skill` / `enable_skill` / `disable_skill` / `grant_status` / `run_skill_action` / `change_stage` / `refresh_skills` 逐个切四步流程 *(completed in migrate-entrypoints-to-runtime-flow Stage A — archived 2026-04-30)*
 - [x] 3.11 运行 `pytest tests/functional -q` 通过
 
 ---
@@ -89,7 +89,7 @@
 - [x] 3.18 测试 · 持久记录引用未知 skill → runtime view 跳过 + `skills_loaded` 持久条目保留以供审计
 - [x] 3.19 测试 · 持久记录携带历史 derived 字段 → 被静默忽略,不影响 governance 决策
 - [x] 3.20 测试 · 索引为空 → runtime view 仅含 meta-tools − blocked,不崩溃
-- [ ] 3.21 测试 · grant 已过期 → `cleanup_expired` 移除后 runtime view 不再包含该 skill 的工具 *(deferred to next change / see closeout backlog #4 — existing `cleanup_expired` tests cover the semantics; a ctx-visibility regression test is follow-up work)*
+- [x] 3.21 测试 · grant 已过期 → `cleanup_expired` 移除后 runtime view 不再包含该 skill 的工具 *(completed in migrate-entrypoints-to-runtime-flow Stage D — archived 2026-04-30)*
 - [x] 3.22 运行 `pytest -q` 全量回归,与 Stage A 记录的基线计数比对:新增用例数 ≈ 本阶段新增测试条目
 
 ## 4. Stage D — 运行、收口、文档同步

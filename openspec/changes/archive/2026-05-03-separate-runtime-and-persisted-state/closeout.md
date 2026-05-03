@@ -112,7 +112,9 @@ All passing under `pytest -q`:
 
 ## Backlog — deferred to future change
 
-1. **`skills_metadata` exclusion from persisted payload** — the Stage
+**Status**: All deferred work completed in follow-up change `migrate-entrypoints-to-runtime-flow` (archived 2026-04-30).
+
+1. **`skills_metadata` exclusion from persisted payload** — ✅ **Completed in migrate-entrypoints-to-runtime-flow**. The Stage
    C3 minimal closeout patch only excludes `active_tools`; removing
    `skills_metadata` is deferred to the MCP / LangChain entry-point
    migration follow-up because unmigrated readers (`mcp_server.py`
@@ -121,21 +123,21 @@ All passing under `pytest -q`:
    contract test explicitly asserts this deferred scope
    (`test_persisted_json_excludes_active_tools`:
    `skills_metadata` MUST still be present until the follow-up lands).
-2. **MCP meta-tool migration** — 8 `@mcp.tool` entries in
+2. **MCP meta-tool migration** — ✅ **Completed in migrate-entrypoints-to-runtime-flow Stage A**. 8 `@mcp.tool` entries in
    `mcp_server.py` (`list_skills` / `read_skill` / `enable_skill` /
    `disable_skill` / `grant_status` / `run_skill_action` /
    `change_stage` / `refresh_skills`) still follow the pre-Stage-C
    `recompute_active_tools(state)` pattern.  Any unification around
    `RuntimeContext` must land together with item 1 so the persisted
    dict can finally drop `skills_metadata` without regression.
-3. **`recompute_active_tools(state)` DeprecationWarning + `tests/test_tool_rewriter.py` migration** —
+3. **`recompute_active_tools(state)` DeprecationWarning + `tests/test_tool_rewriter.py` migration** — ✅ **Completed in migrate-entrypoints-to-runtime-flow**.
    holding off so the MCP migration above can land without production
    log noise.  Tasks 3.2 / 3.4 remain unchecked with explicit deferral
    notes.
-4. **Grant-expiry runtime-view regression test** — existing tests cover
+4. **Grant-expiry runtime-view regression test** — ✅ **Completed in migrate-entrypoints-to-runtime-flow**. existing tests cover
    `cleanup_expired` semantics; a ctx-visibility test for expired
    grants was not added this round (task 3.21 kept deferred).
-5. **LangChain tool shim migration** — `tools/langchain_tools.py:74`
+5. **LangChain tool shim migration** — ✅ **Completed in migrate-entrypoints-to-runtime-flow Stage B**. `tools/langchain_tools.py:74`
    reads `state.skills_metadata` the same way MCP does; moves with
    item 2.
 6. **Open questions from design.md** (all three non-blocking):
@@ -143,9 +145,9 @@ All passing under `pytest -q`:
      (vs `RuntimeView`)
    - OQ2 degradation audit event naming — not emitted this round;
      revisit when observability taxonomy is next touched
-   - OQ3 `recompute_active_tools` deprecation window — tied to items
+   - OQ3 `recompute_active_tools` deprecation window — ✅ **Resolved in migrate-entrypoints-to-runtime-flow**. tied to items
      1–3 above
-7. **Policy_engine.is_tool_allowed migration** — hook gate is already
+7. **Policy_engine.is_tool_allowed migration** — ✅ **Completed in migrate-entrypoints-to-runtime-flow**. hook gate is already
    off this path (Stage C uses `ctx.active_tools_set()` directly), but
    the function remains for MCP callers; it will naturally retire with
    item 2.

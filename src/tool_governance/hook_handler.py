@@ -182,6 +182,8 @@ def handle_user_prompt_submit(input_data: dict[str, Any]) -> dict[str, Any]:
         rt.store.append_audit(
             session_id, "grant.expire", skill_id=skill_id, decision="expired"
         )
+    if not state.skills_metadata:
+        state.skills_metadata = rt.indexer.build_index()
 
     # 2. Derive runtime view.
     ctx = _build_runtime_ctx(rt, state)
@@ -309,6 +311,8 @@ def handle_pre_tool_use(input_data: dict[str, Any]) -> dict[str, Any]:
 
     # 1. Load persisted.
     state = rt.state_manager.load_or_init(session_id)
+    if not state.skills_metadata:
+        state.skills_metadata = rt.indexer.build_index()
 
     # 2. Derive runtime view.
     ctx = _build_runtime_ctx(rt, state)

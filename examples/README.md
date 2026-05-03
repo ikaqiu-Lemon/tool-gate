@@ -10,15 +10,18 @@
 
 ---
 
-## 1. 三个样例一句话定位
+## 1. 样例一句话定位
 
 | 样例 | 主题 | 演示重点 |
 |---|---|---|
 | [`01-knowledge-link/`](./01-knowledge-link/) | 首次发现与自动授权 | 低风险技能自动启用 + 混杂工具硬拦截 + `refresh_skills` 插曲 |
 | [`02-doc-edit-staged/`](./02-doc-edit-staged/) | 受控编辑与分阶段 | `require_reason` + 两阶段 `change_stage` + `blocked_tools` 全局红线 |
 | [`03-lifecycle-and-risk/`](./03-lifecycle-and-risk/) | 会话生命周期与风险升级 | TTL 过期回收 / 主动 `disable` / 高风险 `approval_required` / 审计顺序闭环 |
+| [`simulator-demo/`](./simulator-demo/) | Claude Code 调用链路模拟 | 子进程隔离 + 协议边界 + SQLite 共享状态 + 完整审计链 (独立技术验证) |
 
-三个样例围绕同一个虚构业务故事展开:**知识工程师 Alice 用 Claude Code 维护她的内部知识库**。Alice 的工作台刻意混装了若干 MCP:除语雀风格 MCP 外,还安装了通用 Web 搜索、内部 wiki 搜索、以及一个能跑 shell 的第三方 MCP。tool-gate 的职责是**只让当前启用技能真正需要的工具进到 `active_tools`**,其它一律被 `PreToolUse` 拦下。
+前三个样例围绕同一个虚构业务故事展开:**知识工程师 Alice 用 Claude Code 维护她的内部知识库**。Alice 的工作台刻意混装了若干 MCP:除语雀风格 MCP 外,还安装了通用 Web 搜索、内部 wiki 搜索、以及一个能跑 shell 的第三方 MCP。tool-gate 的职责是**只让当前启用技能真正需要的工具进到 `active_tools`**,其它一律被 `PreToolUse` 拦下。
+
+**`simulator-demo/`** 是独立的技术验证样例,不依赖 Claude Code CLI,通过 Python 子进程模拟完整的 Claude Code 调用链路(SessionStart → UserPromptSubmit → PreToolUse → PostToolUse),演示 hook/MCP 子进程隔离、SQLite 共享状态、以及完整的审计链路。详见 [`simulator-demo/README.md`](./simulator-demo/README.md)。
 
 ---
 

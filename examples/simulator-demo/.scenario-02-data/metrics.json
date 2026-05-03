@@ -1,0 +1,14 @@
+{
+  "session_id": "scenario-02",
+  "total_events": 12,
+  "event_types": {
+    "hook.post_tool_use": 2,
+    "hook.pre_tool_use": 4,
+    "hook.session_start": 1,
+    "hook.user_prompt_submit": 2,
+    "mcp.change_stage": 1,
+    "mcp.enable_skill": 2
+  },
+  "grants_count": 1,
+  "audit_log_count": 11
+}

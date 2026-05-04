@@ -35,7 +35,7 @@
 | 总调用数 | 2 |
 | 成功 | 1 |
 | 被拒绝 | 1 |
-| 白名单违规 | 1 |
+| 工具不可用 | 1 |
 | 全局阻止 | 0 |
 
 ## 6. 工具调用明细
@@ -43,7 +43,7 @@
 | # | 时间 | 工具 | 决策 | Error Bucket | 阶段 | 说明 |
 |---|------|------|------|--------------|------|------|
 | 1 | 14:32:31 | yuque_get_doc | allow | None | analysis | ✅ 在白名单内 |
-| 2 | 14:32:32 | yuque_update_doc | deny | whitelist_violation | analysis | ❌ Tool 'mcp__mock-yuque__yuque_u |
+| 2 | 14:32:32 | yuque_update_doc | deny | tool_not_available | analysis | ❌ Tool 'mcp__mock-yuque__yuque_u |
 
 
 ## 7. 治理效果

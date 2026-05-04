@@ -9,5 +9,5 @@
   "total_tool_calls": 5,
   "successful_tool_calls": 4,
   "denied_tool_calls": 1,
-  "whitelist_violation_count": 1
+  "tool_not_available_count": 1
 }

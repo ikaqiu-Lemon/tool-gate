@@ -106,9 +106,9 @@ class TestAudit:
     def test_detail_json(self, store: SQLiteStore) -> None:
         """The detail dict must be stored as a JSON string — verify
         that the serialised value is present in the returned row."""
-        store.append_audit("s1", "tool.call", detail={"error_bucket": "whitelist_violation"})
+        store.append_audit("s1", "tool.call", detail={"error_bucket": "tool_not_available"})
         rows = store.query_audit(session_id="s1")
-        assert '"whitelist_violation"' in rows[0]["detail"]
+        assert '"tool_not_available"' in rows[0]["detail"]
 
 
 class TestFunnelCounts:

@@ -9,6 +9,7 @@ from the environment or auto-discovery.
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone
 from typing import Any, Literal
 
 from mcp.server.fastmcp import FastMCP
@@ -16,7 +17,7 @@ from mcp.server.fastmcp import FastMCP
 from tool_governance.bootstrap import create_governance_runtime, GovernanceRuntime
 from tool_governance.core.runtime_context import RuntimeContext, build_runtime_context
 from tool_governance.core.state_manager import discover_session_id
-from tool_governance.models.state import SessionState
+from tool_governance.models.state import SessionState, LoadedSkillInfo
 
 # Lazy singleton — initialised on first tool call.
 _runtime: GovernanceRuntime | None = None
@@ -171,6 +172,19 @@ async def enable_skill(
         rt.store.append_audit(sid, "skill.enable", skill_id=skill_id, decision=decision.decision)
         return {"granted": False, "decision": decision.decision, "reason": decision.reason}
 
+    # Stage initialization validation (before creating grant)
+    if meta.stages:
+        # Staged skill — validate initial_stage if configured
+        if meta.initial_stage:
+            stage_ids = [s.stage_id for s in meta.stages]
+            if meta.initial_stage not in stage_ids:
+                # Fail safely — do NOT create grant
+                rt.store.append_audit(
+                    sid, "skill.enable", skill_id=skill_id, decision="deny",
+                    detail={"error_bucket": "invalid_initial_stage", "initial_stage": meta.initial_stage}
+                )
+                return {"granted": False, "error": "invalid_initial_stage"}
+
     # Step 3: Mutate persisted-only fields
     capped_ttl = rt.policy_engine.cap_ttl(skill_id, ttl)
     scope_val: Literal["turn", "session"] = "turn" if scope == "turn" else "session"
@@ -181,6 +195,20 @@ async def enable_skill(
     )
     rt.state_manager.add_to_skills_loaded(state, skill_id, version=meta.version)
     state.active_grants[skill_id] = grant
+
+    # Initialize stage state in LoadedSkillInfo (after add_to_skills_loaded)
+    if skill_id in state.skills_loaded:
+        loaded_info = state.skills_loaded[skill_id]
+        if meta.stages:
+            # Staged skill — initialize stage lifecycle fields
+            target_stage = meta.initial_stage if meta.initial_stage else meta.stages[0].stage_id
+            loaded_info.current_stage = target_stage
+            loaded_info.stage_entered_at = datetime.now(timezone.utc)
+            loaded_info.stage_history = []
+            loaded_info.exited_stages = []
+        else:
+            # No-stage skill — leave current_stage=None, do NOT initialize lifecycle fields
+            loaded_info.current_stage = None
 
     # Rebuild runtime context after mutation to get updated active_tools
     ctx = _build_runtime_ctx(rt, state)
@@ -312,6 +340,15 @@ async def change_stage(skill_id: str, stage_id: str) -> dict[str, Any]:
     This is the best-validated tool — explicitly checks that the
     skill is enabled, has metadata, supports stages, and that the
     requested stage_id exists.
+
+    Stage Transition Governance:
+        - Enforces allowed_next_stages from current stage metadata
+        - Terminal stages (allowed_next_stages=[]) block all transitions
+        - No-stage skills return skill_has_no_stages error
+        - Uninitialized current_stage returns stage_not_initialized error
+        - Denied transitions do not mutate state
+        - Allowed transitions update current_stage, stage_entered_at,
+          stage_history, and exited_stages
     """
     rt = _get_runtime()
     sid = _session_id()
@@ -319,24 +356,95 @@ async def change_stage(skill_id: str, stage_id: str) -> dict[str, Any]:
     state = rt.state_manager.load_or_init(sid)
 
     if skill_id not in state.skills_loaded:
-        return {"error": f"Skill '{skill_id}' must be enabled first"}
+        return {"error": f"Skill '{skill_id}' must be enabled first", "error_bucket": "skill_not_enabled"}
 
     # Step 2: Derive runtime context to get metadata
     ctx = _build_runtime_ctx(rt, state)
 
     meta = ctx.all_skills_metadata.get(skill_id)
     if meta is None:
-        return {"error": f"Skill '{skill_id}' not found"}
+        return {"error": f"Skill '{skill_id}' not found", "error_bucket": "meta_missing"}
 
+    # Check 1: Skill has stages
     if not meta.stages:
-        return {"error": f"Skill '{skill_id}' does not support stages"}
+        rt.store.append_audit(
+            sid, "stage.transition.deny", skill_id=skill_id,
+            detail={"from_stage": None, "to_stage": stage_id, "error_bucket": "skill_has_no_stages"}
+        )
+        return {"error": f"Skill '{skill_id}' does not support stages", "error_bucket": "skill_has_no_stages"}
 
+    # Check 2: Target stage exists
     valid_stages = {s.stage_id for s in meta.stages}
     if stage_id not in valid_stages:
-        return {"error": f"Stage '{stage_id}' not defined. Valid: {sorted(valid_stages)}"}
+        rt.store.append_audit(
+            sid, "stage.transition.deny", skill_id=skill_id,
+            detail={"from_stage": state.skills_loaded[skill_id].current_stage, "to_stage": stage_id, "error_bucket": "stage_not_found"}
+        )
+        return {"error": f"Stage '{stage_id}' not defined. Valid: {sorted(valid_stages)}", "error_bucket": "stage_not_found"}
 
-    # Step 3: Mutate persisted-only field (current_stage)
-    state.skills_loaded[skill_id].current_stage = stage_id
+    # Check 3: Current stage is initialized
+    loaded_info = state.skills_loaded[skill_id]
+    current_stage_id = loaded_info.current_stage
+    if current_stage_id is None:
+        rt.store.append_audit(
+            sid, "stage.transition.deny", skill_id=skill_id,
+            detail={"from_stage": None, "to_stage": stage_id, "error_bucket": "stage_not_initialized"}
+        )
+        return {"error": f"Skill '{skill_id}' current_stage is not initialized", "error_bucket": "stage_not_initialized"}
+
+    # Check 4: Find current stage definition
+    current_stage_def = next((s for s in meta.stages if s.stage_id == current_stage_id), None)
+    if current_stage_def is None:
+        # Should not happen if enable_skill validated properly, but fail safely
+        rt.store.append_audit(
+            sid, "stage.transition.deny", skill_id=skill_id,
+            detail={"from_stage": current_stage_id, "to_stage": stage_id, "error_bucket": "stage_not_found"}
+        )
+        return {"error": f"Current stage '{current_stage_id}' not found in metadata", "error_bucket": "stage_not_found"}
+
+    # Check 5: Validate allowed_next_stages
+    allowed_next = current_stage_def.allowed_next_stages
+    if allowed_next is None:
+        allowed_next = []  # Default to terminal if not specified
+
+    if len(allowed_next) == 0:
+        # Terminal stage
+        rt.store.append_audit(
+            sid, "stage.transition.deny", skill_id=skill_id,
+            detail={"from_stage": current_stage_id, "to_stage": stage_id, "error_bucket": "stage_transition_not_allowed"}
+        )
+        return {"error": f"Stage '{current_stage_id}' is terminal (allowed_next_stages=[])", "error_bucket": "stage_transition_not_allowed"}
+
+    if stage_id not in allowed_next:
+        rt.store.append_audit(
+            sid, "stage.transition.deny", skill_id=skill_id,
+            detail={"from_stage": current_stage_id, "to_stage": stage_id, "error_bucket": "stage_transition_not_allowed"}
+        )
+        return {"error": f"Transition from '{current_stage_id}' to '{stage_id}' not allowed. Allowed: {sorted(allowed_next)}", "error_bucket": "stage_transition_not_allowed"}
+
+    # All checks passed — perform transition
+    # Step 3: Mutate persisted-only fields
+    from datetime import datetime, timezone
+    from tool_governance.models.state import StageTransitionRecord
+
+    now = datetime.now(timezone.utc)
+
+    # Update exited_stages
+    if current_stage_id not in loaded_info.exited_stages:
+        loaded_info.exited_stages.append(current_stage_id)
+
+    # Append to stage_history
+    loaded_info.stage_history.append(
+        StageTransitionRecord(
+            from_stage=current_stage_id,
+            to_stage=stage_id,
+            transitioned_at=now
+        )
+    )
+
+    # Update current_stage and stage_entered_at
+    loaded_info.current_stage = stage_id
+    loaded_info.stage_entered_at = now
 
     # Rebuild runtime context after mutation to get updated active_tools
     ctx = _build_runtime_ctx(rt, state)
@@ -345,8 +453,10 @@ async def change_stage(skill_id: str, stage_id: str) -> dict[str, Any]:
 
     # Step 4: Save persisted state
     rt.state_manager.save(state)
-    rt.store.append_audit(sid, "stage.change", skill_id=skill_id,
-                          detail={"new_stage": stage_id})
+    rt.store.append_audit(
+        sid, "stage.transition.allow", skill_id=skill_id,
+        detail={"from_stage": current_stage_id, "to_stage": stage_id}
+    )
     return {"changed": True, "new_active_tools": list(ctx.active_tools)}
 
 

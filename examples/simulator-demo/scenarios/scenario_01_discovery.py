@@ -5,7 +5,7 @@ Scenario 01: Discovery
 Demonstrates:
 - Low-risk auto-grant
 - Basic discovery flow: list_skills → read_skill → enable_skill
-- Whitelist enforcement (allow/deny)
+- Runtime available tool set enforcement (allow/deny)
 - Mixed MCP environment
 
 Expected audit events:
@@ -13,7 +13,7 @@ Expected audit events:
 2. skill.read
 3. skill.enable (granted)
 4. tool.call (allow)
-5. tool.call (deny - whitelist violation)
+5. tool.call (deny - tool_not_available)
 6. session.end
 """
 

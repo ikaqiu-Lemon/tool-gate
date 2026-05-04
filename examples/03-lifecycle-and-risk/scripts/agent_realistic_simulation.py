@@ -178,7 +178,7 @@ class SessionLogger:
         successful_calls = sum(1 for e in tool_calls if e.get('decision') == 'allow')
         denied_calls = sum(1 for e in tool_calls if e.get('decision') == 'deny')
 
-        whitelist_violations = sum(1 for e in tool_calls if e.get('error_bucket') == 'whitelist_violation')
+        tool_not_availables = sum(1 for e in tool_calls if e.get('error_bucket') == 'tool_not_available')
         blocked_tools = sum(1 for e in tool_calls if e.get('error_bucket') == 'blocked')
 
         grant_expires = sum(1 for e in self.events if e['event_type'] == 'grant.expire')
@@ -196,7 +196,7 @@ class SessionLogger:
             "total_tool_calls": len(tool_calls),
             "successful_tool_calls": successful_calls,
             "denied_tool_calls": denied_calls,
-            "whitelist_violation_count": whitelist_violations,
+            "tool_not_available_count": tool_not_availables,
             "blocked_tool_count": blocked_tools,
             "grant_expire_count": grant_expires,
             "grant_revoke_count": grant_revokes,
@@ -238,7 +238,7 @@ class SessionLogger:
 | 总调用数 | {metrics['total_tool_calls']} |
 | 成功 | {metrics['successful_tool_calls']} |
 | 被拒绝 | {metrics['denied_tool_calls']} |
-| 白名单违规 | {metrics['whitelist_violation_count']} |
+| 工具不可用 | {metrics['tool_not_available_count']} |
 | 全局阻止 | {metrics['blocked_tool_count']} |
 
 ## 5. 工具调用明细
@@ -348,7 +348,7 @@ class Agent:
             "tool_short_name": "yuque_search",
             "decision": decision,
             "deny_reason": reason if decision == "deny" else None,
-            "error_bucket": "whitelist_violation" if decision == "deny" else None
+            "error_bucket": "tool_not_available" if decision == "deny" else None
         })
 
         if decision == "deny":
@@ -495,7 +495,7 @@ class Agent:
             "tool_short_name": "yuque_delete_doc",
             "decision": decision,
             "deny_reason": reason if decision == "deny" else None,
-            "error_bucket": "blocked" if "blocked" in reason.lower() else "whitelist_violation"
+            "error_bucket": "blocked" if "blocked" in reason.lower() else "tool_not_available"
         })
 
         if decision == "deny":

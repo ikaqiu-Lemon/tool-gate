@@ -14,7 +14,7 @@
 ### 关键成果
 - ✅ **会话生命周期管理**: 成功演示权限检查、技能重新启用流程
 - ✅ **风险分级防护**: 高风险技能被 approval_required 策略拦截
-- ✅ **工具白名单治理**: 2 次工具调用均被正确拦截（whitelist_violation）
+- ✅ **工具白名单治理**: 2 次工具调用均被正确拦截（tool_not_available）
 - ✅ **审计日志完整**: 生成 17 个事件，覆盖完整操作链路
 - ✅ **状态快照准确**: 会话前后状态变化清晰可追溯
 
@@ -69,7 +69,7 @@
 **治理决策**: 
 - 工具: `yuque_search`
 - 决策: `deny`
-- 原因: `whitelist_violation` (工具不在 active_tools 中)
+- 原因: `tool_not_available` (工具不在 active_tools 中)
 - 事件记录: `tool.call` (event #4)
 
 #### 阶段 3: 重新启用技能 (0.5s)
@@ -118,7 +118,7 @@
 **治理决策**:
 - 工具: `yuque_delete_doc`
 - 决策: `deny`
-- 原因: `whitelist_violation` (工具不在 active_tools，因为技能未启用)
+- 原因: `tool_not_available` (工具不在 active_tools，因为技能未启用)
 - 预期行为: 即使技能启用，也应被 `blocked_tools` 拦截
 - 事件记录: `tool.call` (event #16)
 
@@ -130,14 +130,14 @@
 
 | # | 时间 | 工具 | 决策 | Error Bucket | 原因 |
 |---|------|------|------|--------------|------|
-| 1 | 15:12:54 | yuque_search | deny | whitelist_violation | 技能未启用，工具不在白名单 |
-| 2 | 15:12:56 | yuque_delete_doc | deny | whitelist_violation | 技能未启用 + 全局阻止 |
+| 1 | 15:12:54 | yuque_search | deny | tool_not_available | 技能未启用，工具不在白名单 |
+| 2 | 15:12:56 | yuque_delete_doc | deny | tool_not_available | 技能未启用 + 全局阻止 |
 
 **治理统计**:
 - 总调用数: 2
 - 成功: 0
 - 被拒绝: 2 (100%)
-- 白名单违规: 2
+- 工具不可用: 2
 - 全局阻止: 0 (因为技能未启用，在白名单阶段就被拦截)
 
 ### 3.2 技能生命周期管理
@@ -203,7 +203,7 @@ session.end (1)
   "tool_name": "mcp__mock-yuque__yuque_search",
   "decision": "deny",
   "deny_reason": "Tool 'mcp__mock-yuque__yuque_search' is not in active_tools",
-  "error_bucket": "whitelist_violation"
+  "error_bucket": "tool_not_available"
 }
 ```
 **分析**: 正确拦截未授权工具调用
@@ -240,7 +240,7 @@ session.end (1)
   "tool_name": "mcp__mock-yuque__yuque_delete_doc",
   "decision": "deny",
   "deny_reason": "Tool 'mcp__mock-yuque__yuque_delete_doc' is not in active_tools",
-  "error_bucket": "whitelist_violation"
+  "error_bucket": "tool_not_available"
 }
 ```
 **分析**: 危险工具被拦截（因为技能未启用）
@@ -315,7 +315,7 @@ session.end (1)
   "total_tool_calls": 2,
   "successful_tool_calls": 0,
   "denied_tool_calls": 2,
-  "whitelist_violation_count": 2,
+  "tool_not_available_count": 2,
   "blocked_tool_count": 0,
   "grant_expire_count": 0,
   "grant_revoke_count": 0
@@ -365,7 +365,7 @@ session.end (1)
 
 #### 问题 3: blocked_tools 未实际触发
 **现象**: 
-- `yuque_delete_doc` 被 `whitelist_violation` 拦截
+- `yuque_delete_doc` 被 `tool_not_available` 拦截
 - 未触发 `blocked_tools` 的全局阻止机制
 
 **原因**: 
@@ -406,7 +406,7 @@ session.end (1)
 
 #### 建议 1: 增强错误信息
 - 在所有 `deny` 决策中提供明确的 `reason` 字段
-- 区分不同的拒绝原因：`whitelist_violation`, `blocked`, `approval_required`, `expired`
+- 区分不同的拒绝原因：`tool_not_available`, `blocked`, `approval_required`, `expired`
 
 #### 建议 2: 完善 TTL 演示
 - 创建 `config/demo_policy.fast.yaml` (TTL=5s)
@@ -434,7 +434,7 @@ session.end (1)
 | N4 · 过期后重新授权 | ✅ 成功 | yuque-knowledge-link 重新启用 |
 | N5 · disable 顺序 | ❌ 未覆盖 | yuque-doc-edit 启用失败 |
 | N6 · approval_required | ✅ 成功 | yuque-bulk-delete 被拒绝 |
-| N7 · blocked_tools | ⚠️ 部分 | 工具被拦截，但原因是 whitelist_violation |
+| N7 · blocked_tools | ⚠️ 部分 | 工具被拦截，但原因是 tool_not_available |
 | N8 · refresh_skills | ❌ 未执行 | 未包含在本次模拟中 |
 
 ### 8.2 治理能力验证

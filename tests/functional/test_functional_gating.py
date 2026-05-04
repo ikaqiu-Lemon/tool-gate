@@ -39,7 +39,7 @@ class TestPreToolUseDeniesNonAllowlistedTool:
             )
             assert result["hookSpecificOutput"]["permissionDecision"] == "allow"
 
-    def test_deny_records_whitelist_violation_audit(
+    def test_deny_records_tool_not_available_audit(
         self, tmp_path, session_id
     ) -> None:
         with runtime_context(tmp_path) as rt:
@@ -51,7 +51,7 @@ class TestPreToolUseDeniesNonAllowlistedTool:
             denies = [row for row in calls if row.get("decision") == "deny"]
             assert len(denies) >= 1
             detail = decoded_detail(denies[-1])
-            assert detail.get("error_bucket") == "whitelist_violation"
+            assert detail.get("error_bucket") == "tool_not_available"
 
     def test_mcp_namespaced_tool_is_denied_when_not_active(
         self, tmp_path, session_id

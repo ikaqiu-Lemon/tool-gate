@@ -320,7 +320,7 @@ logs/
   "tool_name": str,
   "tool_short_name": str,  # 提取 mcp__xxx__yyy → yyy
   "decision": "allow" | "deny" | "error",
-  "error_bucket": "whitelist_violation" | "wrong_skill_tool" | "parameter_error" | None,
+  "error_bucket": "tool_not_available" | "wrong_skill_tool" | "parameter_error" | None,
   "deny_reason": str | None,
   "owning_skill": str | None,  # 从 RuntimeContext 推断
   "in_active_tools": bool,
@@ -333,7 +333,7 @@ logs/
 ```
 
 **error_bucket 分类**:
-- `whitelist_violation`: 工具不在当前 active_tools 中
+- `tool_not_available`: 工具不在当前 active_tools 中
 - `wrong_skill_tool`: 工具属于某个 Skill，但该 Skill 未启用
 - `parameter_error`: 工具执行失败（从 PostToolUse 的 `_is_error_response` 判断）
 
@@ -348,14 +348,14 @@ logs/
 | 3 | 07:36:30 | yuque_get_doc | allow | - | ✅ 在白名单内 |
 | 4 | 07:36:40 | yuque_get_doc | allow | - | ✅ 在白名单内 |
 | 5 | 07:36:50 | yuque_get_doc | allow | - | ✅ 在白名单内 |
-| 6 | 07:37:10 | rag_paper_search | deny | whitelist_violation | ❌ 工具不在白名单 |
+| 6 | 07:37:10 | rag_paper_search | deny | tool_not_available | ❌ 工具不在白名单 |
 
 **统计**:
 - 总调用数: 6
 - 成功: 5
 - 被拒绝: 1
 - 错误: 0
-- whitelist_violation: 1
+- tool_not_available: 1
 - wrong_skill_tool: 0
 - parameter_error: 0
 ```
@@ -549,7 +549,7 @@ export LANGFUSE_HOST=https://cloud.langfuse.com
 | active_tools_avg | 3 | 平均 active_tools 数量 |
 | active_tools_max | 3 | 最大 active_tools 数量 |
 | tool_reduction_ratio | 94% | (50-3)/50 |
-| whitelist_violation_count | 1 | rag_paper_search |
+| tool_not_available_count | 1 | rag_paper_search |
 | wrong_skill_tool_count | 0 | - |
 | parameter_error_count | 0 | - |
 
@@ -577,7 +577,7 @@ export LANGFUSE_HOST=https://cloud.langfuse.com
 - 优先级: P3
 
 ## 11. 本次运行结论
-- ✅ Skill 治理链路生效，成功拦截 whitelist_violation
+- ✅ Skill 治理链路生效，成功拦截 tool_not_available
 - ✅ active_tools 有效收敛，从 50+ 降至 3
 - ✅ 无误调用或授权异常
 - ⚠️ 缺少原始用户请求和任务完成度评估
@@ -612,7 +612,7 @@ export LANGFUSE_HOST=https://cloud.langfuse.com
   "active_tools_avg": 3,
   "active_tools_max": 3,
   "tool_reduction_ratio": 0.94,
-  "whitelist_violation_count": 1,
+  "tool_not_available_count": 1,
   "wrong_skill_tool_count": 0,
   "schema_error_count": 0,
   "tool_runtime_error_count": 0,

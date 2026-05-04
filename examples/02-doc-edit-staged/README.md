@@ -127,8 +127,8 @@ examples/02-doc-edit-staged/
 - N1 · `yuque-doc-edit` 技能 `risk_level: medium`,策略 `require_reason: true`;不带 reason 的 `enable_skill` 直接 deny
 - N2 · 启用后进入默认阶段 `analysis`,`active_tools` = `meta + yuque_get_doc + yuque_list_docs`;`yuque_update_doc` 不在其中
 - N3 · `change_stage("yuque-doc-edit", "execution")` 后,`active_tools` 切换为 `meta + yuque_get_doc + yuque_update_doc`
-- N4 · 全局 `blocked_tools: [run_command]`:即使第三方 `mock-shell` MCP 在 `.mcp.json` 里注册,`run_command` 任何时刻尝试都被 deny,且原因标记 `blocked`(区别于 `whitelist_violation`)
-- N5 · 审计表应出现 `skill.enable (denied)` → `skill.enable (granted)` → `stage.change analysis → execution` → `whitelist_violation yuque_update_doc stage=analysis` → `tool.call yuque_update_doc decision=allow stage=execution` → `tool.call run_command decision=deny reason=blocked`
+- N4 · 全局 `blocked_tools: [run_command]`:即使第三方 `mock-shell` MCP 在 `.mcp.json` 里注册,`run_command` 任何时刻尝试都被 deny,且原因标记 `blocked`(区别于 `tool_not_available`)
+- N5 · 审计表应出现 `skill.enable (denied)` → `skill.enable (granted)` → `stage.change analysis → execution` → `tool_not_available yuque_update_doc stage=analysis` → `tool.call yuque_update_doc decision=allow stage=execution` → `tool.call run_command decision=deny reason=blocked`
 
 ---
 
@@ -206,7 +206,7 @@ examples/02-doc-edit-staged/
   "total_tool_calls": 5,
   "successful_tool_calls": 3,
   "denied_tool_calls": 2,
-  "whitelist_violation_count": 1,
+  "tool_not_available_count": 1,
   "blocked_tools_count": 1,
   "stage_changes": 1
 }
@@ -220,7 +220,7 @@ created_at                         event                subject                 
 2026-04-19T11:15:08+08:00          skill.enable         skill=yuque-doc-edit                             decision=denied reason=reason_missing
 2026-04-19T11:15:15+08:00          skill.enable         skill=yuque-doc-edit                             decision=granted stage=analysis reason="..."
 2026-04-19T11:15:22+08:00          tool.call            tool=yuque_get_doc  stage=analysis               decision=allow
-2026-04-19T11:16:02+08:00          tool.call            tool=yuque_update_doc  stage=analysis           decision=deny reason=whitelist_violation
+2026-04-19T11:16:02+08:00          tool.call            tool=yuque_update_doc  stage=analysis           decision=deny reason=tool_not_available
 2026-04-19T11:16:08+08:00          stage.change         skill=yuque-doc-edit  from=analysis to=execution
 2026-04-19T11:16:20+08:00          tool.call            tool=yuque_update_doc  stage=execution          decision=allow
 2026-04-19T11:16:38+08:00          tool.call            tool=run_command                                 decision=deny reason=blocked
@@ -295,7 +295,7 @@ sqlite3 .demo-data/governance.db "SELECT * FROM audit_log ORDER BY created_at;"
    - Skill 漏斗指标（shown/read/enabled/denied）
    - reason_missing 计数
    - 工具调用指标（total/successful/denied）
-   - 白名单违规计数
+   - 工具不可用计数
    - 全局阻止计数
    - 阶段切换次数
 
@@ -339,7 +339,7 @@ rm -rf ./.demo-data logs
 | 症状 | 根因 | 验证 | 修复 |
 |---|---|---|---|
 | 第一次 `enable_skill("yuque-doc-edit")` 返回 `decision=denied reason=reason_missing` | 本 workspace 策略 `require_reason: true`;中风险技能必须带 `reason` 才能启用 —— 这是**预期行为** | 读 `config/demo_policy.yaml` 中 `skill_policies.yuque-doc-edit.require_reason` | 在 `enable_skill` 的第二次调用里传 `reason="..."` 参数 |
-| `change_stage("yuque-doc-edit","execution")` 之前 `yuque_update_doc` 被拒 | stage 不匹配归类 `whitelist_violation`;文案会提示"stage=analysis" | 读审计日志中的 `tool.call whitelist_violation yuque_update_doc stage=analysis` | 调 `change_stage("yuque-doc-edit","execution")` 后重试 |
+| `change_stage("yuque-doc-edit","execution")` 之前 `yuque_update_doc` 被拒 | stage 不匹配归类 `tool_not_available`;文案会提示"stage=analysis" | 读审计日志中的 `tool.call tool_not_available yuque_update_doc stage=analysis` | 调 `change_stage("yuque-doc-edit","execution")` 后重试 |
 | `run_command` 任何时候都被 deny | `run_command` 在**全局** `blocked_tools` 列表,优先级高于任何 skill 授权 —— 这是预期 | 审计日志最后一行 `tool.call run_command decision=deny reason=blocked` | 不修;`run_command` 是混杂变量工具,永不放行 |
 
 ---
@@ -419,6 +419,6 @@ rm -rf .demo-data logs
 - **total_tool_calls**: 5
 - **successful_tool_calls**: 3
 - **denied_tool_calls**: 2
-- **whitelist_violation_count**: 1
+- **tool_not_available_count**: 1
 - **blocked_tools_count**: 1
 - **stage_changes**: 1

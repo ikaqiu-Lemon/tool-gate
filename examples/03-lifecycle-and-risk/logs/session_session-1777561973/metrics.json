@@ -10,7 +10,7 @@
   "total_tool_calls": 2,
   "successful_tool_calls": 0,
   "denied_tool_calls": 2,
-  "whitelist_violation_count": 2,
+  "tool_not_available_count": 2,
   "blocked_tool_count": 0,
   "grant_expire_count": 0,
   "grant_revoke_count": 0

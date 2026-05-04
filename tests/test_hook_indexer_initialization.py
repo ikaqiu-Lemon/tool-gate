@@ -99,7 +99,7 @@ class TestHookIndexerInitialization:
 
         Regression test for the bug where PreToolUse did not call
         rt.indexer.build_index() when skills_metadata was empty, causing
-        all tool calls to be denied with whitelist_violation.
+        all tool calls to be denied with tool_not_available.
         """
         # Step 1: SessionStart to create the session
         handle_session_start({"session_id": "test-pre-tool"})
@@ -120,7 +120,7 @@ class TestHookIndexerInitialization:
         runtime.state_manager.save(state)
 
         # Step 4: PreToolUse in a "new subprocess" (empty indexer)
-        # Before the fix, this would deny the tool with whitelist_violation
+        # Before the fix, this would deny the tool with tool_not_available
         # After the fix, it should initialize the indexer and allow the tool
         pre_tool_result = handle_pre_tool_use(
             {"session_id": "test-pre-tool", "tool_name": "Read"}

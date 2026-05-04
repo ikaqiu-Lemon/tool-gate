@@ -1,12 +1,12 @@
-{"type": "hook.session_start", "timestamp": "2026-05-03T06:12:11.318146", "session_id": "scenario-02"}
-{"type": "mcp.enable_skill", "timestamp": "2026-05-03T06:12:11.332715", "skill_id": "yuque-doc-edit", "reason": null}
-{"type": "mcp.enable_skill", "timestamp": "2026-05-03T06:12:11.338799", "skill_id": "yuque-doc-edit", "reason": "Update related docs section"}
-{"type": "hook.user_prompt_submit", "timestamp": "2026-05-03T06:12:11.596036", "session_id": "scenario-02"}
-{"type": "hook.pre_tool_use", "timestamp": "2026-05-03T06:12:11.781416", "tool_name": "mcp__mock-yuque__yuque_get_doc", "decision": "unknown"}
-{"type": "hook.post_tool_use", "timestamp": "2026-05-03T06:12:12.032738", "tool_name": "mcp__mock-yuque__yuque_get_doc"}
-{"type": "hook.pre_tool_use", "timestamp": "2026-05-03T06:12:12.247826", "tool_name": "mcp__mock-yuque__yuque_update_doc", "decision": "unknown"}
-{"type": "mcp.change_stage", "timestamp": "2026-05-03T06:12:12.254518", "skill_id": "yuque-doc-edit", "stage_id": "execution"}
-{"type": "hook.user_prompt_submit", "timestamp": "2026-05-03T06:12:12.507725", "session_id": "scenario-02"}
-{"type": "hook.pre_tool_use", "timestamp": "2026-05-03T06:12:12.835097", "tool_name": "mcp__mock-yuque__yuque_update_doc", "decision": "unknown"}
-{"type": "hook.post_tool_use", "timestamp": "2026-05-03T06:12:13.132311", "tool_name": "mcp__mock-yuque__yuque_update_doc"}
-{"type": "hook.pre_tool_use", "timestamp": "2026-05-03T06:12:13.341447", "tool_name": "Bash", "decision": "unknown"}
+{"type": "hook.session_start", "timestamp": "2026-05-03T14:25:47.813121", "session_id": "scenario-02"}
+{"type": "mcp.enable_skill", "timestamp": "2026-05-03T14:25:47.830693", "skill_id": "yuque-doc-edit", "reason": null}
+{"type": "mcp.enable_skill", "timestamp": "2026-05-03T14:25:47.842164", "skill_id": "yuque-doc-edit", "reason": "Update related docs section"}
+{"type": "hook.user_prompt_submit", "timestamp": "2026-05-03T14:25:48.110437", "session_id": "scenario-02"}
+{"type": "hook.pre_tool_use", "timestamp": "2026-05-03T14:25:48.499133", "tool_name": "mcp__mock-yuque__yuque_get_doc", "decision": "unknown"}
+{"type": "hook.post_tool_use", "timestamp": "2026-05-03T14:25:48.752171", "tool_name": "mcp__mock-yuque__yuque_get_doc"}
+{"type": "hook.pre_tool_use", "timestamp": "2026-05-03T14:25:49.034255", "tool_name": "mcp__mock-yuque__yuque_update_doc", "decision": "unknown"}
+{"type": "mcp.change_stage", "timestamp": "2026-05-03T14:25:49.045724", "skill_id": "yuque-doc-edit", "stage_id": "execution"}
+{"type": "hook.user_prompt_submit", "timestamp": "2026-05-03T14:25:49.236807", "session_id": "scenario-02"}
+{"type": "hook.pre_tool_use", "timestamp": "2026-05-03T14:25:49.558822", "tool_name": "mcp__mock-yuque__yuque_update_doc", "decision": "unknown"}
+{"type": "hook.post_tool_use", "timestamp": "2026-05-03T14:25:49.741543", "tool_name": "mcp__mock-yuque__yuque_update_doc"}
+{"type": "hook.pre_tool_use", "timestamp": "2026-05-03T14:25:50.011042", "tool_name": "Bash", "decision": "unknown"}

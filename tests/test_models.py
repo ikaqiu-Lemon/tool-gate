@@ -10,7 +10,7 @@ from datetime import datetime
 from tool_governance.models.grant import Grant
 from tool_governance.models.policy import GovernancePolicy, SkillPolicy
 from tool_governance.models.skill import SkillContent, SkillMetadata, StageDefinition
-from tool_governance.models.state import LoadedSkillInfo, SessionState
+from tool_governance.models.state import LoadedSkillInfo, SessionState, StageTransitionRecord
 
 
 class TestSkillModels:
@@ -22,6 +22,7 @@ class TestSkillModels:
         assert meta.risk_level == "low"
         assert meta.allowed_tools == []
         assert meta.stages == []
+        assert meta.initial_stage is None
         assert meta.default_ttl == 3600
         assert meta.version == "1.0.0"
 
@@ -75,6 +76,45 @@ class TestSkillModels:
         assert content.sop.startswith("# Test")
         assert content.examples == []
 
+    def test_skill_metadata_with_initial_stage(self) -> None:
+        """Verify SkillMetadata can be instantiated with initial_stage."""
+        meta = SkillMetadata(
+            skill_id="staged-skill",
+            name="Staged Skill",
+            initial_stage="diagnosis",
+            stages=[
+                StageDefinition(stage_id="diagnosis", allowed_tools=["Read"]),
+                StageDefinition(stage_id="execution", allowed_tools=["Write"]),
+            ],
+        )
+        assert meta.initial_stage == "diagnosis"
+        assert len(meta.stages) == 2
+
+    def test_stage_definition_with_allowed_next_stages(self) -> None:
+        """Verify StageDefinition can be instantiated with allowed_next_stages."""
+        stage = StageDefinition(
+            stage_id="analysis",
+            description="Analysis phase",
+            allowed_tools=["Read"],
+            allowed_next_stages=["execution", "abort"],
+        )
+        assert stage.allowed_next_stages == ["execution", "abort"]
+
+    def test_stage_definition_allowed_next_stages_defaults_to_empty_list(self) -> None:
+        """Verify allowed_next_stages defaults to empty list (terminal stage)."""
+        stage = StageDefinition(stage_id="complete", allowed_tools=["Read"])
+        assert stage.allowed_next_stages == []
+
+    def test_stage_definition_terminal_stage_preserved(self) -> None:
+        """Verify allowed_next_stages: [] is preserved as empty list, not None."""
+        stage = StageDefinition(
+            stage_id="terminal",
+            allowed_tools=["Read"],
+            allowed_next_stages=[],
+        )
+        assert stage.allowed_next_stages == []
+        assert stage.allowed_next_stages is not None
+
 
 class TestGrantModel:
     def test_grant_defaults(self) -> None:
@@ -116,6 +156,108 @@ class TestStateModels:
         assert info.version == "1.0.0"
         assert info.current_stage is None
         assert info.last_used_at is None
+
+    def test_loaded_skill_info_stage_lifecycle_defaults(self) -> None:
+        """Verify new stage lifecycle fields have safe defaults."""
+        info = LoadedSkillInfo(skill_id="test-skill")
+        assert info.stage_entered_at is None
+        assert info.stage_history == []
+        assert info.exited_stages == []
+
+    def test_stage_transition_record_instantiation(self) -> None:
+        """Verify StageTransitionRecord can be instantiated."""
+        now = datetime(2026, 5, 3, 10, 30, 0)
+        record = StageTransitionRecord(
+            from_stage="analysis",
+            to_stage="execution",
+            transitioned_at=now,
+        )
+        assert record.from_stage == "analysis"
+        assert record.to_stage == "execution"
+        assert record.transitioned_at == now
+
+    def test_stage_history_default_not_shared(self) -> None:
+        """Verify stage_history default list is not shared between instances."""
+        info1 = LoadedSkillInfo(skill_id="skill1")
+        info2 = LoadedSkillInfo(skill_id="skill2")
+        now = datetime(2026, 5, 3, 10, 30, 0)
+        info1.stage_history.append(
+            StageTransitionRecord(from_stage="a", to_stage="b", transitioned_at=now)
+        )
+        assert len(info1.stage_history) == 1
+        assert len(info2.stage_history) == 0
+
+    def test_exited_stages_default_not_shared(self) -> None:
+        """Verify exited_stages default list is not shared between instances."""
+        info1 = LoadedSkillInfo(skill_id="skill1")
+        info2 = LoadedSkillInfo(skill_id="skill2")
+        info1.exited_stages.append("analysis")
+        assert len(info1.exited_stages) == 1
+        assert len(info2.exited_stages) == 0
+
+    def test_loaded_skill_info_stage_fields_serialization(self) -> None:
+        """Verify new stage fields serialize to JSON."""
+        now = datetime(2026, 5, 3, 10, 30, 0)
+        info = LoadedSkillInfo(
+            skill_id="test-skill",
+            stage_entered_at=now,
+            stage_history=[
+                StageTransitionRecord(from_stage="a", to_stage="b", transitioned_at=now)
+            ],
+            exited_stages=["analysis"],
+        )
+        data = info.model_dump()
+        assert data["stage_entered_at"] == now
+        assert len(data["stage_history"]) == 1
+        assert data["stage_history"][0]["from_stage"] == "a"
+        assert data["exited_stages"] == ["analysis"]
+
+    def test_loaded_skill_info_stage_fields_deserialization(self) -> None:
+        """Verify new stage fields restore from JSON."""
+        now = datetime(2026, 5, 3, 10, 30, 0)
+        data = {
+            "skill_id": "test-skill",
+            "version": "1.0.0",
+            "current_stage": "execution",
+            "stage_entered_at": now.isoformat(),
+            "stage_history": [
+                {
+                    "from_stage": "analysis",
+                    "to_stage": "execution",
+                    "transitioned_at": now.isoformat(),
+                }
+            ],
+            "exited_stages": ["analysis"],
+        }
+        info = LoadedSkillInfo.model_validate(data)
+        assert info.stage_entered_at == now
+        assert len(info.stage_history) == 1
+        assert info.stage_history[0].from_stage == "analysis"
+        assert info.exited_stages == ["analysis"]
+
+    def test_loaded_skill_info_backward_compatibility(self) -> None:
+        """Verify old state JSON (missing new fields) still loads."""
+        data = {
+            "skill_id": "old-skill",
+            "version": "1.0.0",
+            "current_stage": "analysis",
+            "last_used_at": datetime(2026, 5, 3, 10, 0, 0).isoformat(),
+        }
+        info = LoadedSkillInfo.model_validate(data)
+        assert info.skill_id == "old-skill"
+        assert info.current_stage == "analysis"
+        # New fields should have defaults
+        assert info.stage_entered_at is None
+        assert info.stage_history == []
+        assert info.exited_stages == []
+
+    def test_loaded_skill_info_current_stage_not_broken(self) -> None:
+        """Verify existing current_stage behavior is not broken."""
+        info = LoadedSkillInfo(skill_id="test", current_stage="execution")
+        assert info.current_stage == "execution"
+        data = info.model_dump()
+        restored = LoadedSkillInfo.model_validate(data)
+        assert restored.current_stage == "execution"
 
     def test_session_state_empty(self) -> None:
         """An empty session must have all collection fields initialised

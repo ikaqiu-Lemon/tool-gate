@@ -27,7 +27,7 @@ breaking runtime config changes; existing `data_dir`, `skills_dir`, and
   a precise `error_bucket` in `detail`:
   - `wrong_skill_tool` — the tool belongs to an indexed skill that
     was not enabled,
-  - `whitelist_violation` — the tool is unknown or was stripped by
+  - `tool_not_available` — the tool is unknown or was stripped by
     `blocked_tools`/stage gating from an enabled skill,
   - `parameter_error` — recorded by PostToolUse when `tool_response`
     carries an `is_error` / `error` signal.

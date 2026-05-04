@@ -60,7 +60,7 @@
 | 工具调用总数 | 2 | yuque_search, yuque_delete_doc |
 | 工具调用成功 | 0 | 全部被拦截 |
 | 工具调用拒绝 | 2 | 100% 拦截率 |
-| 白名单违规 | 2 | whitelist_violation |
+| 工具不可用 | 2 | tool_not_available |
 | 活跃 Grant | 1 | yuque-knowledge-link |
 
 ---
@@ -75,7 +75,7 @@
 | N4 · 过期后重新授权 | ✅ 成功 | yuque-knowledge-link 重新启用 |
 | N5 · disable 顺序 | ❌ 未覆盖 | yuque-doc-edit 启用失败 |
 | N6 · approval_required | ✅ 成功 | yuque-bulk-delete 被拒绝 |
-| N7 · blocked_tools | ⚠️ 部分 | 工具被拦截，但原因是 whitelist_violation |
+| N7 · blocked_tools | ⚠️ 部分 | 工具被拦截，但原因是 tool_not_available |
 | N8 · refresh_skills | ❌ 未执行 | 未包含在本次模拟中 |
 
 **覆盖率**: 3/8 完全成功，1/8 部分成功，4/8 未覆盖
@@ -98,7 +98,7 @@
 
 3. **增强错误信息**:
    - 确保所有 deny 决策都有明确的 reason
-   - 区分 whitelist_violation, blocked, approval_required, expired
+   - 区分 tool_not_available, blocked, approval_required, expired
 
 ### 中期改进 (P1)
 

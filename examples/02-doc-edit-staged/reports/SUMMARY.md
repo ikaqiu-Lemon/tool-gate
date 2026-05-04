@@ -78,7 +78,7 @@
 2. **阶段白名单过滤**
    - yuque_get_doc 在 analysis 阶段成功
    - yuque_update_doc 在 analysis 阶段被拒绝
-   - error_bucket 正确标记为 whitelist_violation
+   - error_bucket 正确标记为 tool_not_available
 
 3. **日志记录完整**
    - 17 个事件全部记录
@@ -118,7 +118,7 @@
 | total_tool_calls | 5 | 2 | ❌ |
 | successful_tool_calls | 3 | 1 | ❌ |
 | denied_tool_calls | 2 | 1 | ❌ |
-| whitelist_violation_count | 1 | 1 | ✅ |
+| tool_not_available_count | 1 | 1 | ✅ |
 | blocked_tools_count | 1 | 0 | ❌ |
 | stage_changes | 1 | 1 | ✅ |
 

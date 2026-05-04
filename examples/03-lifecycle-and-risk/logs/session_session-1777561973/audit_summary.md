@@ -30,15 +30,15 @@
 | 总调用数 | 2 |
 | 成功 | 0 |
 | 被拒绝 | 2 |
-| 白名单违规 | 2 |
+| 工具不可用 | 2 |
 | 全局阻止 | 0 |
 
 ## 5. 工具调用明细
 
 | # | 时间 | 工具 | 决策 | Error Bucket | 说明 |
 |---|------|------|------|--------------|------|
-| 1 | 15:12:54 | yuque_search | deny | whitelist_violation | ❌ Tool 'mcp__mock-yuque__yuque_search' is  |
-| 2 | 15:12:56 | yuque_delete_doc | deny | whitelist_violation | ❌ Tool 'mcp__mock-yuque__yuque_delete_doc' |
+| 1 | 15:12:54 | yuque_search | deny | tool_not_available | ❌ Tool 'mcp__mock-yuque__yuque_search' is  |
+| 2 | 15:12:56 | yuque_delete_doc | deny | tool_not_available | ❌ Tool 'mcp__mock-yuque__yuque_delete_doc' |
 
 
 ## 6. 治理效果

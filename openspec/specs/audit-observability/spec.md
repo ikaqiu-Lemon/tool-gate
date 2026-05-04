@@ -47,12 +47,12 @@ The audit system SHALL support funnel analysis across the stages: `shown` (list_
 
 ### Requirement: Misuse call bucketing
 
-The audit system SHALL classify denied tool calls into three buckets: (1) `whitelist_violation` — tool not in any enabled skill's allowed_tools, (2) `wrong_skill_tool` — tool belongs to a different skill than intended, (3) `parameter_error` — correct tool but invalid parameters. The bucket classification MUST be recorded in the audit log's `detail` field as `error_bucket`.
+The audit system SHALL classify denied tool calls into three buckets: (1) `tool_not_available` — tool not in any enabled skill's allowed_tools, (2) `wrong_skill_tool` — tool belongs to a different skill than intended, (3) `parameter_error` — correct tool but invalid parameters. The bucket classification MUST be recorded in the audit log's `detail` field as `error_bucket`.
 
-#### Scenario: Whitelist violation bucket
+#### Scenario: Tool not available bucket
 
 - **WHEN** the model calls the Bash tool while no enabled skill includes Bash in its allowed_tools
-- **THEN** the audit entry includes `error_bucket: "whitelist_violation"`
+- **THEN** the audit entry includes `error_bucket: "tool_not_available"`
 
 #### Scenario: Wrong skill tool bucket
 

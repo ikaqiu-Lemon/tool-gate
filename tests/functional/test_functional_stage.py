@@ -3,7 +3,7 @@
 Covers the spec Requirement "Lifecycle and Interception Coverage" —
 ``change_stage`` path: enable a medium-risk stageful mock, verify the
 default stage's tools appear, switch stage, verify the new stage's
-tools replace the old set, and a ``stage.change`` audit row is written.
+tools replace the old set, and a ``stage.transition.allow`` audit row is written.
 """
 
 from __future__ import annotations
@@ -54,7 +54,9 @@ class TestChangeStageSwapsToolSet:
             assert "mock_read" not in new_tools
             assert "mock_glob" not in new_tools
 
-            audits = events_of_type(rt, session_id, "stage.change")
+            audits = events_of_type(rt, session_id, "stage.transition.allow")
             assert len(audits) == 1
             assert audits[0]["skill_id"] == "mock_stageful"
-            assert decoded_detail(audits[0])["new_stage"] == "execution"
+            detail = decoded_detail(audits[0])
+            assert detail["from_stage"] == "analysis"
+            assert detail["to_stage"] == "execution"

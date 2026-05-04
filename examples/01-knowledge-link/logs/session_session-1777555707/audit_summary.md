@@ -27,7 +27,7 @@
 | 总调用数 | 5 |
 | 成功 | 4 |
 | 被拒绝 | 1 |
-| 白名单违规 | 1 |
+| 工具不可用 | 1 |
 
 ## 5. 工具调用明细
 
@@ -37,7 +37,7 @@
 | 2 | 13:28:30 | yuque_get_doc | allow | None | ✅ 在白名单内 |
 | 3 | 13:28:30 | yuque_get_doc | allow | None | ✅ 在白名单内 |
 | 4 | 13:28:30 | yuque_get_doc | allow | None | ✅ 在白名单内 |
-| 5 | 13:28:31 | rag_paper_search | deny | whitelist_violation | ❌ Tool 'mcp__mock-web-search__ra |
+| 5 | 13:28:31 | rag_paper_search | deny | tool_not_available | ❌ Tool 'mcp__mock-web-search__ra |
 
 
 ## 6. 治理效果

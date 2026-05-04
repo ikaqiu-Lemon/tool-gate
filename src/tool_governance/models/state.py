@@ -11,6 +11,18 @@ from tool_governance.models.grant import Grant
 from tool_governance.models.skill import SkillMetadata
 
 
+class StageTransitionRecord(BaseModel):
+    """Record of a successful stage transition.
+
+    Only successful transitions are recorded in stage_history.
+    Denied transition attempts are recorded in audit only.
+    """
+
+    from_stage: str
+    to_stage: str
+    transitioned_at: datetime
+
+
 class LoadedSkillInfo(BaseModel):
     """Snapshot of an enabled skill in the session.
 
@@ -29,6 +41,13 @@ class LoadedSkillInfo(BaseModel):
     # its top-level allowed_tools.
     current_stage: str | None = None
     last_used_at: datetime | None = None
+    # Stage lifecycle fields (added in enforce-stage-transition-governance):
+    # When the skill entered its current_stage, or None if never entered a stage.
+    stage_entered_at: datetime | None = None
+    # History of successful stage transitions. Denied attempts are not recorded here.
+    stage_history: list[StageTransitionRecord] = Field(default_factory=list)
+    # Stages that have been exited (left). Does not imply business completion.
+    exited_stages: list[str] = Field(default_factory=list)
 
 
 class SessionState(BaseModel):

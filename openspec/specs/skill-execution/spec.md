@@ -24,7 +24,7 @@ The `run_skill_action` MCP tool SHALL verify that the specified skill is enabled
 
 ### Requirement: Validate operation in allowed_ops
 
-The system SHALL check that the requested `op` is in the skill's `allowed_ops` list before dispatching. Operations not in the whitelist MUST be rejected.
+The system SHALL check that the requested `op` is in the skill's `allowed_ops` list before dispatching. Operations not in the allowed list MUST be rejected.
 
 #### Scenario: Allowed operation passes
 

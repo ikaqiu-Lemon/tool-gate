@@ -169,7 +169,7 @@ class TestE3HighRiskDenyUnderRestrictive:
 class TestE4BlockedToolStripsAndDenies:
     """E2E-4 — ``blocked_tools`` (tool-name route) strips the tool from
     ``active_tools`` even after a successful enable, and PreToolUse
-    denies it with ``error_bucket="whitelist_violation"``.
+    denies it with ``error_bucket="tool_not_available"``.
 
     Uses an inline derivative that keeps ``blocked_tools: [mock_read]``
     but drops the ``mock_readonly`` approval override so enable succeeds
@@ -207,7 +207,7 @@ class TestE4BlockedToolStripsAndDenies:
                 if r.get("decision") == "deny"
             ]
             assert denies
-            assert decoded_detail(denies[-1]).get("error_bucket") == "whitelist_violation"
+            assert decoded_detail(denies[-1]).get("error_bucket") == "tool_not_available"
 
 
 # ---------------------------------------------------------------- E5

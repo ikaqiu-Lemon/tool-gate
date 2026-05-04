@@ -54,7 +54,7 @@ cd /home/zh/tool-gate/examples/02-doc-edit-staged
 - total_tool_calls: 5
 - successful_tool_calls: 3
 - denied_tool_calls: 2
-- whitelist_violation_count: 1
+- tool_not_available_count: 1
 - blocked_tools_count: 1
 - stage_changes: 1
 

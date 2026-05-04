@@ -231,7 +231,7 @@ examples/01-knowledge-link/
 | T+9s | — | `read_skill("yuque-knowledge-link")` | MCP `read_skill` 返回 SOP + `allowed_tools: [yuque_search, yuque_list_docs, yuque_get_doc]` + `risk_level: low`;审计写 `skill.read` |
 | T+16s | — | `enable_skill("yuque-knowledge-link")` | `PolicyEngine.evaluate` → `risk=low → auto` → 创建 `Grant(scope=session, ttl=3600)`;`active_tools` 追加 3 个 yuque 只读工具;审计写 `skill.enable granted_by=auto` |
 | T+22s | — | `yuque_search(query="RAG", type="doc")` | `PreToolUse` allow → mock 返回 3 条候选文档;`PostToolUse` 写 `tool.call yuque_search` + 更新 `last_used_at` |
-| T+29s | — | `rag_paper_search(query="RAG 综述 2026")`(越界尝试) | `PreToolUse` **deny** → `additionalContext`:"`rag_paper_search` 不在当前已授权技能范围内,请先 `read_skill` / `enable_skill`";审计写 `tool.call whitelist_violation rag_paper_search` |
+| T+29s | — | `rag_paper_search(query="RAG 综述 2026")`(越界尝试) | `PreToolUse` **deny** → `additionalContext`:"`rag_paper_search` 不在当前已授权技能范围内,请先 `read_skill` / `enable_skill`";审计写 `tool.call tool_not_available rag_paper_search` |
 | T+35s | — | `yuque_list_docs(repo_id="team-rag")` | `PreToolUse` allow → mock 返回该 repo 文档列表;`PostToolUse` 写审计 |
 | T+42s | — | `yuque_get_doc(doc_id="rag-overview-v2")` × 3(对 Top-3 候选逐篇深读) | 每次 allow + 审计 |
 | T+57s | — | `run_skill_action("yuque-knowledge-link", op="relate", args={...})` | `skill_executor` 分发 → 返回关联报告(主题簇 + 关系边 + 缺口)+ 审计写 `skill.action relate` |
@@ -263,7 +263,7 @@ examples/01-knowledge-link/
   "total_tool_calls": 6,
   "successful_tool_calls": 5,
   "denied_tool_calls": 1,
-  "whitelist_violation_count": 1
+  "tool_not_available_count": 1
 }
 ```
 
@@ -275,7 +275,7 @@ created_at                         event                       subject          
 2026-04-30T12:00:09+08:00          skill.read                  skill=yuque-knowledge-link                  risk=low
 2026-04-30T12:00:16+08:00          skill.enable                skill=yuque-knowledge-link                  granted_by=auto ttl=3600
 2026-04-30T12:00:22+08:00          tool.call                   tool=yuque_search                           decision=allow
-2026-04-30T12:00:29+08:00          tool.call                   tool=rag_paper_search                       decision=deny reason=whitelist_violation
+2026-04-30T12:00:29+08:00          tool.call                   tool=rag_paper_search                       decision=deny reason=tool_not_available
 2026-04-30T12:00:35+08:00          tool.call                   tool=yuque_list_docs                        decision=allow
 2026-04-30T12:00:42+08:00 (×3)     tool.call                   tool=yuque_get_doc                          decision=allow
 2026-04-30T12:00:57+08:00          skill.action                skill=yuque-knowledge-link op=relate        ok=true
@@ -322,7 +322,7 @@ sqlite3 .demo-data/governance.db "SELECT * FROM audit_log ORDER BY created_at;"
    - 会话时长
    - Skill 漏斗指标（shown/read/enabled）
    - 工具调用指标（total/successful/denied）
-   - 白名单违规计数
+   - 工具不可用计数
 
 4. **state_before.json** - 会话开始时状态快照
    - skills_metadata
@@ -369,7 +369,7 @@ sqlite3 .demo-data/governance.db "SELECT * FROM audit_log ORDER BY created_at;"
   - `src/tool_governance/bootstrap.py` → `load_policy` + `GovernanceRuntime` 组装
 - 对照 functional tests:
   - `tests/functional/test_functional_happy_path.py` — happy chain(list → read → enable → run_skill_action → PostToolUse)
-  - `tests/functional/test_functional_gating.py` — PreToolUse deny + `whitelist_violation` 审计 + MCP 命名空间 deny
+  - `tests/functional/test_functional_gating.py` — PreToolUse deny + `tool_not_available` 审计 + MCP 命名空间 deny
   - `tests/functional/test_functional_refresh.py` — `refresh_skills` 可见性 + 单次 `build_index`
 
 ---
@@ -484,7 +484,7 @@ rm -rf .demo-data logs
 | Enable skill | 自动授权（低风险） |
 | yuque_search | ✅ 允许 |
 | yuque_get_doc | ✅ 允许 |
-| rag_paper_search | ❌ 拒绝（白名单违规） |
+| rag_paper_search | ❌ 拒绝（工具不可用） |
 | yuque_update_doc | ❌ 拒绝（不在 allowed_tools） |
 
 ### 关键指标
@@ -495,4 +495,4 @@ rm -rf .demo-data logs
 - **total_tool_calls**: 6
 - **successful_tool_calls**: 5
 - **denied_tool_calls**: 1
-- **whitelist_violation_count**: 1
+- **tool_not_available_count**: 1

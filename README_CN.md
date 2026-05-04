@@ -368,7 +368,7 @@ flowchart TD
     D --> E["Compose additionalContext<br/>(catalog + tools + guidance)"]
     E --> F["Inject into model context"]
     F --> G["Model responds with tool calls"]
-    G --> H["PreToolUse: check whitelist"]
+    G --> H["PreToolUse: check active_tools"]
     H -->|allow| I["Tool executes"]
     H -->|deny| J["Guidance: use enable_skill flow"]
     I --> K["PostToolUse: audit + last_used_at"]

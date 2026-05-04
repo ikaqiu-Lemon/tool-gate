@@ -89,7 +89,7 @@ cat logs/session_*/events.jsonl
   "total_tool_calls": 2,
   "successful_tool_calls": 1,
   "denied_tool_calls": 1,
-  "whitelist_violation_count": 1,
+  "tool_not_available_count": 1,
   "blocked_tools_count": 0,
   "stage_changes": 1
 }

@@ -72,7 +72,7 @@
 |---|---|---|
 | `test_functional_fixture_sanity.py` | 1 | 索引器跳过 malformed/oversized，保留 5 个 mock |
 | `test_functional_happy_path.py` | 7 | SessionStart → list → read → enable → UserPromptSubmit → run_skill_action → PostToolUse |
-| `test_functional_gating.py` | 4 | PreToolUse deny / meta-tool 放行 / `whitelist_violation` 审计 / `mcp__mock_echo__echo` 命名空间 deny |
+| `test_functional_gating.py` | 4 | PreToolUse deny / meta-tool 放行 / `tool_not_available` 审计 / `mcp__mock_echo__echo` 命名空间 deny |
 | `test_functional_stage.py` | 1 | `change_stage` + `stage.change` 审计 |
 | `test_functional_ttl.py` | 2 | `ttl=0` 阻断 `run_skill_action`；UserPromptSubmit 扫描发 `grant.expire` |
 | `test_functional_refresh.py` | 2 | `mock_refreshable` 投放后 `refresh_skills` 可见；单次 `build_index` 调用 |
@@ -240,7 +240,7 @@ python -m pytest tests/functional/test_functional_gating.py -q
 
 **失败先检查**：
 - meta-tool 返回 deny → `_META_SHORT_NAMES` frozenset 被破坏。
-- `whitelist_violation` 审计 bucket 缺失 → `handle_pre_tool_use` 的
+- `tool_not_available` 审计 bucket 缺失 → `handle_pre_tool_use` 的
   `detail` 字段被改。
 
 ---

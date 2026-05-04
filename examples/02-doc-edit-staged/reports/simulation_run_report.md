@@ -22,7 +22,7 @@
 3. ❌ 尝试启用技能（无 reason）→ 被拒绝
 4. ✅ 重新启用技能（带 reason）→ 成功，进入 analysis 阶段
 5. ✅ 读取文档内容 (yuque_get_doc)
-6. ❌ 尝试写入文档（analysis 阶段）→ 被拒绝（白名单违规）
+6. ❌ 尝试写入文档（analysis 阶段）→ 被拒绝（工具不可用）
 7. ✅ 检查授权状态 (grant_status)
 8. ❌ 尝试切换阶段 (change_stage) → 失败
 
@@ -45,7 +45,7 @@
 | 总调用数 | 2 | yuque_get_doc + yuque_update_doc |
 | 成功 | 1 | yuque_get_doc (analysis 阶段) |
 | 被拒绝 | 1 | yuque_update_doc (analysis 阶段) |
-| 白名单违规 | 1 | yuque_update_doc 不在 analysis 白名单 |
+| 工具不可用 | 1 | yuque_update_doc 不在 analysis 白名单 |
 | 全局阻止 | 0 | 未尝试 run_command |
 
 ### 阶段切换
@@ -61,7 +61,7 @@
 | # | 时间 | 工具 | 阶段 | 决策 | Error Bucket | 说明 |
 |---|------|------|------|------|--------------|------|
 | 1 | 14:32:31 | yuque_get_doc | analysis | allow | - | ✅ 成功读取文档 |
-| 2 | 14:32:32 | yuque_update_doc | analysis | deny | whitelist_violation | ❌ 不在 analysis 白名单 |
+| 2 | 14:32:32 | yuque_update_doc | analysis | deny | tool_not_available | ❌ 不在 analysis 白名单 |
 
 ---
 
@@ -80,7 +80,7 @@ T+2.5s  skill.enable: granted (stage=unknown)
 T+3.0s  agent.action: call_tool (yuque_get_doc)
 T+3.0s  tool.call: yuque_get_doc → allow
 T+3.5s  agent.action: call_tool (yuque_update_doc)
-T+3.5s  tool.call: yuque_update_doc → deny (whitelist_violation)
+T+3.5s  tool.call: yuque_update_doc → deny (tool_not_available)
 T+4.0s  agent.action: grant_status
 T+4.5s  agent.action: change_stage (execution)
 T+4.5s  stage.change: analysis → execution (failed)
@@ -103,9 +103,9 @@ T+4.6s  session.end
    - analysis 阶段不能写入（yuque_update_doc 被拒绝）
    - ✅ 阶段白名单过滤正常工作
 
-3. **白名单违规检测**
+3. **工具不可用检测**
    - yuque_update_doc 在 analysis 阶段被拒绝
-   - error_bucket 正确标记为 whitelist_violation
+   - error_bucket 正确标记为 tool_not_available
    - ✅ 工具白名单检查生效
 
 ### ⚠️ 发现的问题
@@ -183,7 +183,7 @@ T+4.6s  session.end
 | total_tool_calls | 5 | 2 | ❌ |
 | successful_tool_calls | 3 | 1 | ❌ |
 | denied_tool_calls | 2 | 1 | ❌ |
-| whitelist_violation_count | 1 | 1 | ✅ |
+| tool_not_available_count | 1 | 1 | ✅ |
 | blocked_tools_count | 1 | 0 | ❌ |
 | stage_changes | 1 | 1 | ✅ |
 

@@ -238,8 +238,8 @@ async def test_change_stage_does_not_read_state_skills_metadata(mock_runtime, po
             allowed_ops=[],
             source_path="/real/path",
             stages=[
-                StageDefinition(stage_id="stage1", description="Stage 1", allowed_tools=["Read"]),
-                StageDefinition(stage_id="stage2", description="Stage 2", allowed_tools=["Write"]),
+                StageDefinition(stage_id="stage1", description="Stage 1", allowed_tools=["Read"], allowed_next_stages=["stage2"]),
+                StageDefinition(stage_id="stage2", description="Stage 2", allowed_tools=["Write"], allowed_next_stages=[]),
             ],
         )
     }

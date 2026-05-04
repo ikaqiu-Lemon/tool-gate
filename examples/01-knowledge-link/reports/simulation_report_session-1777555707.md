@@ -28,8 +28,8 @@
 | **技能启用** | 1 个 | 自动授权（低风险） |
 | **工具调用总数** | 5 次 | 4 成功 + 1 拒绝 |
 | **成功调用** | 4 次 | 全部为 Yuque 相关工具 |
-| **拒绝调用** | 1 次 | `rag_paper_search` 白名单违规 |
-| **白名单违规** | 1 次 | 治理机制成功拦截 |
+| **拒绝调用** | 1 次 | `rag_paper_search` 工具不可用 |
+| **工具不可用** | 1 次 | 治理机制成功拦截 |
 
 ---
 
@@ -85,7 +85,7 @@
 13:28:31.692  [Tool Call #5] ❌ rag_paper_search
               └─ 决策: deny
               └─ 原因: Tool 'mcp__mock-web-search__rag_paper_search' is not in active_tools
-              └─ Error Bucket: whitelist_violation
+              └─ Error Bucket: tool_not_available
 
 13:28:32.195  [Session End]
               └─ 状态: completed
@@ -118,7 +118,7 @@
 
 | 工具名称 | 完整名称 | 拒绝原因 | Error Bucket |
 |---------|---------|---------|--------------|
-| `rag_paper_search` | `mcp__mock-web-search__rag_paper_search` | 不在 `yuque-knowledge-link` 的 `allowed_tools` 中 | `whitelist_violation` |
+| `rag_paper_search` | `mcp__mock-web-search__rag_paper_search` | 不在 `yuque-knowledge-link` 的 `allowed_tools` 中 | `tool_not_available` |
 
 ### 3. 授权状态快照
 
@@ -174,7 +174,7 @@
 | 13:28:30.687 | `tool.call` | 工具调用 #2 |
 | 13:28:30.689 | `tool.call` | 工具调用 #3 |
 | 13:28:30.689 | `tool.call` | 工具调用 #4 |
-| 13:28:31.693 | `tool.call` | 工具调用 #5（error_bucket: whitelist_violation） |
+| 13:28:31.693 | `tool.call` | 工具调用 #5（error_bucket: tool_not_available） |
 
 ### 日志文件（5 个）
 
@@ -223,11 +223,11 @@
 
 ### ❌ 预期的拒绝行为
 
-1. **白名单违规拦截**
+1. **工具不可用拦截**
    - Agent 尝试调用 `rag_paper_search`（属于 `mock-web-search` MCP 服务器）
    - 该工具不在 `yuque-knowledge-link` 技能的 `allowed_tools` 中
    - 治理框架成功拦截，返回拒绝消息
-   - Error Bucket: `whitelist_violation`
+   - Error Bucket: `tool_not_available`
 
 2. **拒绝消息质量**
    - 消息清晰：`Tool 'mcp__mock-web-search__rag_paper_search' is not in active_tools`
@@ -250,7 +250,7 @@
     - yuque_list_docs
   ```
 - 治理框架在 `PreToolUse` 钩子中检查工具是否在白名单内
-- 检查失败 → 拒绝调用 → 记录 `whitelist_violation`
+- 检查失败 → 拒绝调用 → 记录 `tool_not_available`
 
 **设计意图**:
 - 这是**预期行为**，用于演示白名单机制的有效性
@@ -327,7 +327,7 @@ allowed_tools:
         ↓
     tool in active_tools?
         ↓ No
-    [Deny] → error_bucket: whitelist_violation
+    [Deny] → error_bucket: tool_not_available
         ↓ Yes
     [Allow] → forward to MCP server
         ↓

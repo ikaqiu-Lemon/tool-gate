@@ -19,13 +19,13 @@ This document maps the three existing examples to simulator demo capabilities, e
 - read_skill("yuque-knowledge-link") (MCP meta-tool)
 - enable_skill("yuque-knowledge-link") → auto-grant (low risk)
 - UserPromptSubmit → active_tools recompute
-- PreToolUse("yuque_search") → allow (in whitelist)
+- PreToolUse("yuque_search") → allow (in runtime available tool set)
 - PostToolUse("yuque_search") → audit
-- PreToolUse("rag_paper_search") → deny (whitelist_violation, not in enabled skill)
+- PreToolUse("rag_paper_search") → deny (tool_not_available, not in enabled skill)
 
 **Governance behaviors demonstrated**:
 - Auto-grant for low-risk skills
-- Whitelist enforcement (allow vs. deny)
+- Runtime available tool set enforcement (allow vs. deny)
 - Mixed MCP environment (only enabled skill's tools allowed)
 - Audit trail: session.start, skill.read, skill.enable, tool.call (allow), tool.call (deny)
 
@@ -54,7 +54,7 @@ This document maps the three existing examples to simulator demo capabilities, e
 **Governance behaviors demonstrated**:
 - require_reason enforcement (deny without reason, grant with reason)
 - Stage transitions via change_stage
-- Stage-aware whitelist filtering
+- Stage-aware tool filtering
 - blocked_tools global red line (overrides any skill authorization)
 - Audit trail: skill.enable (denied), skill.enable (granted), stage.change, tool.call (deny/allow)
 
@@ -72,7 +72,7 @@ This document maps the three existing examples to simulator demo capabilities, e
 **Maps to Scenario 03 (Lifecycle)**:
 - SessionStart (with pre-existing grant that has expired)
 - UserPromptSubmit → cleanup_expired_grants → grant.expire event
-- PreToolUse("yuque_search") → deny (expired skill, whitelist_violation)
+- PreToolUse("yuque_search") → deny (expired skill, tool_not_available)
 - enable_skill("yuque-knowledge-link") → re-grant (low risk, auto)
 - disable_skill("yuque-doc-edit") → grant.revoke + skill.disable (strict ordering)
 - enable_skill("yuque-bulk-delete") → deny (approval_required, high risk)
@@ -92,7 +92,7 @@ These elements appear in all three scenarios and form the core governance chain:
 
 1. **SessionStart hook**: Initialize state, inject skill catalog into additionalContext
 2. **UserPromptSubmit hook**: Cleanup expired grants, recompute active_tools, inject updated context
-3. **PreToolUse hook**: Check whitelist, return allow/deny decision
+3. **PreToolUse hook**: Check active_tools, return allow/deny decision
 4. **PostToolUse hook**: Write audit event, update last_used_at
 5. **MCP meta-tools**: enable_skill, disable_skill, change_stage, list_skills, read_skill, grant_status, run_skill_action, refresh_skills
 6. **SQLite shared state**: Grants, skills_loaded, audit_log, session_state
@@ -106,7 +106,7 @@ These elements appear in all three scenarios and form the core governance chain:
 ### Scenario 01 Only
 - Auto-grant for low-risk skills
 - Mixed MCP environment demonstration
-- Basic whitelist violation (unauthorized tool from different MCP)
+- Basic tool_not_available (unauthorized tool from different MCP)
 
 ### Scenario 02 Only
 - require_reason enforcement
@@ -165,5 +165,5 @@ The simulator successfully demonstrates the governance chain if:
 3. ✅ Subprocess isolation is verified (real tg-hook and tg-mcp processes)
 4. ✅ Protocol correctness is verified (JSON-RPC and stdio formats)
 5. ✅ Shared state integrity is verified (MCP writes, hooks read via SQLite)
-6. ✅ Allow/deny decisions match expectations (whitelist, blocked_tools, require_reason, approval_required)
+6. ✅ Allow/deny decisions match expectations (runtime available tool set, blocked_tools, require_reason, approval_required)
 7. ✅ Session artifacts are generated (events.jsonl, audit_summary.md, metrics.json, state snapshots)

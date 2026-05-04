@@ -2,7 +2,7 @@
 
 ## Summary
 
-Fixed a critical bug where `handle_user_prompt_submit` and `handle_pre_tool_use` failed to initialize the skill indexer when `skills_metadata` was empty, causing all tool calls to be denied with `whitelist_violation` errors.
+Fixed a critical bug where `handle_user_prompt_submit` and `handle_pre_tool_use` failed to initialize the skill indexer when `skills_metadata` was empty, causing all tool calls to be denied with `tool_not_available` errors.
 
 ## Root Cause
 

@@ -8,7 +8,7 @@ This document defines the three core scenarios that the simulator will execute, 
 
 ### Overview
 
-**Purpose**: Demonstrate basic skill discovery, low-risk auto-grant, and whitelist enforcement.
+**Purpose**: Demonstrate basic skill discovery, low-risk auto-grant, and runtime available tool set enforcement.
 
 **Derived from**: `examples/01-knowledge-link/`
 
@@ -43,7 +43,7 @@ This document defines the three core scenarios that the simulator will execute, 
 
 #### 6. Authorized Tool Call (Allow)
 - **Action**: PreToolUse("yuque_search", {query: "RAG", type: "doc"})
-- **Expected**: Hook checks active_tools → yuque_search is in whitelist → allow
+- **Expected**: Hook checks active_tools → yuque_search is in runtime available tool set → allow
 - **Audit**: None (PreToolUse doesn't write audit on allow)
 - **Action**: PostToolUse("yuque_search")
 - **Expected**: Hook writes audit event, updates last_used_at
@@ -51,8 +51,8 @@ This document defines the three core scenarios that the simulator will execute, 
 
 #### 7. Unauthorized Tool Call (Deny)
 - **Action**: PreToolUse("rag_paper_search", {query: "RAG survey 2026"})
-- **Expected**: Hook checks active_tools → rag_paper_search NOT in whitelist → deny with guidance
-- **Audit**: `tool.call` event with tool=rag_paper_search, decision=deny, error_bucket=whitelist_violation
+- **Expected**: Hook checks active_tools → rag_paper_search NOT in runtime available tool set → deny with guidance
+- **Audit**: `tool.call` event with tool=rag_paper_search, decision=deny, error_bucket=tool_not_available
 
 #### 8. Session End
 - **Action**: Generate session artifacts
@@ -65,14 +65,14 @@ This document defines the three core scenarios that the simulator will execute, 
 2. `skill.read` - Read yuque-knowledge-link skill (risk=low)
 3. `skill.enable` - Enable yuque-knowledge-link (decision=granted, granted_by=auto)
 4. `tool.call` - yuque_search (decision=allow)
-5. `tool.call` - rag_paper_search (decision=deny, error_bucket=whitelist_violation)
+5. `tool.call` - rag_paper_search (decision=deny, error_bucket=tool_not_available)
 6. `session.end` - Session termination
 
 ### Expected Session Artifacts
 
 - `events.jsonl`: 6 events in temporal order
 - `audit_summary.md`: Session metadata, skill funnel (1 shown, 1 read, 1 enabled), tool call statistics (1 allow, 1 deny)
-- `metrics.json`: shown_skills=1, read_skills=1, enabled_skills=1, total_tool_calls=2, successful_tool_calls=1, denied_tool_calls=1, whitelist_violation_count=1
+- `metrics.json`: shown_skills=1, read_skills=1, enabled_skills=1, total_tool_calls=2, successful_tool_calls=1, denied_tool_calls=1, tool_not_available_count=1
 - `state_before.json`: Empty grants, no skills loaded
 - `state_after.json`: 1 grant (yuque-knowledge-link), 1 skill loaded
 
@@ -120,15 +120,15 @@ This document defines the three core scenarios that the simulator will execute, 
 
 #### 5. Read Tool Call (Allow in Analysis Stage)
 - **Action**: PreToolUse("yuque_get_doc", {doc_id: "rag-overview-v2"})
-- **Expected**: Hook checks active_tools → yuque_get_doc is in analysis stage whitelist → allow
+- **Expected**: Hook checks active_tools → yuque_get_doc is in analysis stage available tools → allow
 - **Audit**: None (PreToolUse doesn't write on allow)
 - **Action**: PostToolUse("yuque_get_doc")
 - **Audit**: `tool.call` event with tool=yuque_get_doc, decision=allow, stage=analysis
 
 #### 6. Write Tool Call (Deny in Analysis Stage)
 - **Action**: PreToolUse("yuque_update_doc", {doc_id: "rag-overview-v2", body: "..."})
-- **Expected**: Hook checks active_tools → yuque_update_doc NOT in analysis stage whitelist → deny with guidance
-- **Audit**: `tool.call` event with tool=yuque_update_doc, decision=deny, error_bucket=whitelist_violation, stage=analysis
+- **Expected**: Hook checks active_tools → yuque_update_doc NOT in analysis stage available tools → deny with guidance
+- **Audit**: `tool.call` event with tool=yuque_update_doc, decision=deny, error_bucket=tool_not_available, stage=analysis
 
 #### 7. Stage Transition
 - **Action**: change_stage("yuque-doc-edit", "execution") (MCP meta-tool)
@@ -142,7 +142,7 @@ This document defines the three core scenarios that the simulator will execute, 
 
 #### 9. Write Tool Call (Allow in Execution Stage)
 - **Action**: PreToolUse("yuque_update_doc", {doc_id: "rag-overview-v2", body: "..."})
-- **Expected**: Hook checks active_tools → yuque_update_doc is in execution stage whitelist → allow
+- **Expected**: Hook checks active_tools → yuque_update_doc is in execution stage available tools → allow
 - **Audit**: None
 - **Action**: PostToolUse("yuque_update_doc")
 - **Audit**: `tool.call` event with tool=yuque_update_doc, decision=allow, stage=execution
@@ -162,7 +162,7 @@ This document defines the three core scenarios that the simulator will execute, 
 2. `skill.enable` - yuque-doc-edit (decision=denied, reason=reason_missing)
 3. `skill.enable` - yuque-doc-edit (decision=granted, stage=analysis)
 4. `tool.call` - yuque_get_doc (decision=allow, stage=analysis)
-5. `tool.call` - yuque_update_doc (decision=deny, error_bucket=whitelist_violation, stage=analysis)
+5. `tool.call` - yuque_update_doc (decision=deny, error_bucket=tool_not_available, stage=analysis)
 6. `stage.change` - yuque-doc-edit (from=analysis, to=execution)
 7. `tool.call` - yuque_update_doc (decision=allow, stage=execution)
 8. `tool.call` - run_command (decision=deny, error_bucket=blocked)
@@ -172,7 +172,7 @@ This document defines the three core scenarios that the simulator will execute, 
 
 - `events.jsonl`: 9 events in temporal order
 - `audit_summary.md`: Skill funnel (1 shown, 1 read, 1 enabled, 1 denied), stage transitions (1), tool call statistics (2 allow, 2 deny)
-- `metrics.json`: enabled_skills=1, denied_skills=1, reason_missing_count=1, total_tool_calls=4, successful_tool_calls=2, denied_tool_calls=2, whitelist_violation_count=1, blocked_tools_count=1, stage_changes=1
+- `metrics.json`: enabled_skills=1, denied_skills=1, reason_missing_count=1, total_tool_calls=4, successful_tool_calls=2, denied_tool_calls=2, tool_not_available_count=1, blocked_tools_count=1, stage_changes=1
 - `state_before.json`: Empty grants
 - `state_after.json`: 1 grant (yuque-doc-edit, stage=execution)
 
@@ -210,8 +210,8 @@ This document defines the three core scenarios that the simulator will execute, 
 
 #### 3. Expired Tool Call (Deny)
 - **Action**: PreToolUse("yuque_search", {query: "RAG"})
-- **Expected**: Hook checks active_tools → yuque_search NOT in whitelist (expired) → deny with guidance
-- **Audit**: `tool.call` event with tool=yuque_search, decision=deny, error_bucket=whitelist_violation
+- **Expected**: Hook checks active_tools → yuque_search NOT in runtime available tool set (expired) → deny with guidance
+- **Audit**: `tool.call` event with tool=yuque_search, decision=deny, error_bucket=tool_not_available
 
 #### 4. Re-Authorization
 - **Action**: enable_skill("yuque-knowledge-link") (MCP meta-tool)
@@ -241,7 +241,7 @@ This document defines the three core scenarios that the simulator will execute, 
 
 1. `session.start` - Session initialization
 2. `grant.expire` - yuque-knowledge-link (reason=ttl)
-3. `tool.call` - yuque_search (decision=deny, error_bucket=whitelist_violation)
+3. `tool.call` - yuque_search (decision=deny, error_bucket=tool_not_available)
 4. `skill.enable` - yuque-knowledge-link (decision=granted, granted_by=auto)
 5. `grant.revoke` - yuque-doc-edit
 6. `skill.disable` - yuque-doc-edit (timestamp > grant.revoke timestamp)
@@ -252,7 +252,7 @@ This document defines the three core scenarios that the simulator will execute, 
 
 - `events.jsonl`: 8 events in temporal order
 - `audit_summary.md`: Skill funnel (enabled=1, disabled=1, denied=1), grant lifecycle (1 expire, 1 revoke), tool call statistics (0 allow, 1 deny)
-- `metrics.json`: enabled_skills=1, disabled_skills=1, denied_skills=1, grant_expire_count=1, grant_revoke_count=1, total_tool_calls=1, denied_tool_calls=1, whitelist_violation_count=1
+- `metrics.json`: enabled_skills=1, disabled_skills=1, denied_skills=1, grant_expire_count=1, grant_revoke_count=1, total_tool_calls=1, denied_tool_calls=1, tool_not_available_count=1
 - `state_before.json`: 1 expired grant (yuque-knowledge-link)
 - `state_after.json`: 1 grant (yuque-knowledge-link, re-authorized)
 

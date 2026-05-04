@@ -125,8 +125,14 @@ def _build_metadata(skill_id: str, fm: dict[str, Any], source_path: str) -> Skil
                         stage_id=s["stage_id"],
                         description=str(s.get("description", "")),
                         allowed_tools=list(s.get("allowed_tools", [])),
+                        allowed_next_stages=list(s.get("allowed_next_stages", [])),
                     )
                 )
+
+    # Extract initial_stage if present
+    initial_stage = fm.get("initial_stage")
+    if initial_stage is not None:
+        initial_stage = str(initial_stage)
 
     return SkillMetadata(
         skill_id=skill_id,
@@ -136,6 +142,7 @@ def _build_metadata(skill_id: str, fm: dict[str, Any], source_path: str) -> Skil
         allowed_tools=list(fm.get("allowed_tools", [])),
         allowed_ops=list(fm.get("allowed_ops", [])),
         stages=stages,
+        initial_stage=initial_stage,
         default_ttl=int(fm.get("default_ttl", 3600)),
         source_path=source_path,
         version=str(fm.get("version", "1.0.0")),

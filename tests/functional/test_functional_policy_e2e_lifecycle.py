@@ -41,7 +41,7 @@ def _policy_variant(tmp_path: Path, base: Path, mutate) -> Path:
 # ---------------------------------------------------------------- E7
 class TestE7ChangeStageUnderPolicy:
     """E2E-5b — ``change_stage`` still swaps active_tools and emits
-    ``stage.change`` audit when policy comes from an inline derivative
+    ``stage.transition.allow`` audit when policy comes from an inline derivative
     of ``restrictive.yaml`` (``mock_stageful.auto_grant=true``,
     ``require_reason=true``).  Enabling with a reason auto-grants via
     the skill-specific route; default stage = analysis, switching to
@@ -91,10 +91,12 @@ class TestE7ChangeStageUnderPolicy:
             assert "mock_read" not in new_tools
             assert "mock_glob" not in new_tools
 
-            audits = events_of_type(rt, session_id, "stage.change")
+            audits = events_of_type(rt, session_id, "stage.transition.allow")
             assert len(audits) == 1
             assert audits[0]["skill_id"] == "mock_stageful"
-            assert decoded_detail(audits[0])["new_stage"] == "execution"
+            detail = decoded_detail(audits[0])
+            assert detail["from_stage"] == "analysis"
+            assert detail["to_stage"] == "execution"
 
 
 # ---------------------------------------------------------------- E8

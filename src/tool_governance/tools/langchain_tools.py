@@ -13,6 +13,7 @@ composition and testing.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any, Literal
 
 from langchain_core.tools import tool
@@ -96,6 +97,15 @@ def enable_skill_tool(
     if not decision.allowed:
         return {"granted": False, "decision": decision.decision, "reason": decision.reason}
 
+    # Stage initialization validation (before creating grant)
+    if meta.stages:
+        # Staged skill — validate initial_stage if configured
+        if meta.initial_stage:
+            stage_ids = [s.stage_id for s in meta.stages]
+            if meta.initial_stage not in stage_ids:
+                # Fail safely — do NOT create grant
+                return {"granted": False, "error": "invalid_initial_stage"}
+
     capped_ttl = runtime.policy_engine.cap_ttl(skill_id, ttl)
     scope_val: Literal["turn", "session"] = "turn" if scope == "turn" else "session"
     granted_by_val: Literal["auto", "user", "policy"] = (
@@ -112,6 +122,20 @@ def enable_skill_tool(
     )
     runtime.state_manager.add_to_skills_loaded(state, skill_id, version=meta.version)
     state.active_grants[skill_id] = grant
+
+    # Initialize stage state in LoadedSkillInfo (after add_to_skills_loaded)
+    if skill_id in state.skills_loaded:
+        loaded_info = state.skills_loaded[skill_id]
+        if meta.stages:
+            # Staged skill — initialize stage lifecycle fields
+            target_stage = meta.initial_stage if meta.initial_stage else meta.stages[0].stage_id
+            loaded_info.current_stage = target_stage
+            loaded_info.stage_entered_at = datetime.now(timezone.utc)
+            loaded_info.stage_history = []
+            loaded_info.exited_stages = []
+        else:
+            # No-stage skill — leave current_stage=None, do NOT initialize lifecycle fields
+            loaded_info.current_stage = None
 
     # Recompute active_tools after mutation
     ctx = build_runtime_context(

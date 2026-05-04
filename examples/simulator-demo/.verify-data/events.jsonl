@@ -1,4 +1,0 @@
-{"type": "hook.session_start", "timestamp": "2026-05-02T06:43:50.285527", "session_id": "verify-session"}
-{"type": "hook.user_prompt_submit", "timestamp": "2026-05-02T06:43:50.441447", "session_id": "verify-session"}
-{"type": "hook.pre_tool_use", "timestamp": "2026-05-02T06:43:50.605891", "tool_name": "mcp__tool-governance__list_skills", "decision": "unknown"}
-{"type": "hook.post_tool_use", "timestamp": "2026-05-02T06:43:50.760541", "tool_name": "mcp__tool-governance__list_skills"}

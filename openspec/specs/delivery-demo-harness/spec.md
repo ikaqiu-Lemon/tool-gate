@@ -200,7 +200,7 @@ This change SHALL NOT modify files under `src/tool_governance/`, `tests/function
 
 ### Requirement: Mixed-Tool Interception Demonstrated In Every Workspace
 
-Each workspace MUST demonstrate tool-gate's hard-interception behavior by including at least one intentional "confounder" tool call attempt whose `系统侧事件` column records either a `PreToolUse` deny with `whitelist_violation` or a `blocked_tools` denial. The confounder tool MUST be a real MCP tool registered via the workspace's `.mcp.json`, not a fictional name.
+Each workspace MUST demonstrate tool-gate's hard-interception behavior by including at least one intentional "confounder" tool call attempt whose `系统侧事件` column records either a `PreToolUse` deny with `tool_not_available` or a `blocked_tools` denial. The confounder tool MUST be a real MCP tool registered via the workspace's `.mcp.json`, not a fictional name.
 
 #### Scenario: Workspace 01 confounder
 

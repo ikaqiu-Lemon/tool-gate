@@ -231,7 +231,7 @@ def _classify_deny_bucket(tool_name: str, runtime_ctx: RuntimeContext) -> str:
       not in any enabled skill's ``allowed_tools`` (top-level or stage),
       but it IS in some *other* indexed skill's ``allowed_tools`` — the
       model picked a known tool without enabling the skill that owns it.
-    - ``whitelist_violation``: every other deny — no skill is enabled
+    - ``tool_not_available``: every other deny — no skill is enabled
       at all, the tool is unknown to every indexed skill, or the tool
       belongs to an enabled skill but was stripped from ``active_tools``
       by policy (e.g. ``blocked_tools`` or stage gating).
@@ -251,14 +251,14 @@ def _classify_deny_bucket(tool_name: str, runtime_ctx: RuntimeContext) -> str:
     enabled_ids = runtime_ctx.enabled_skill_ids()
 
     if not enabled_ids:
-        return "whitelist_violation"
+        return "tool_not_available"
 
     for sv in runtime_ctx.enabled_skills:
         if short_name in sv.metadata.allowed_tools:
-            return "whitelist_violation"
+            return "tool_not_available"
         for stage in sv.metadata.stages or []:
             if short_name in stage.allowed_tools:
-                return "whitelist_violation"
+                return "tool_not_available"
 
     for skill_id, meta in runtime_ctx.all_skills_metadata.items():
         if not meta or skill_id in enabled_ids:
@@ -269,7 +269,7 @@ def _classify_deny_bucket(tool_name: str, runtime_ctx: RuntimeContext) -> str:
             if short_name in stage.allowed_tools:
                 return "wrong_skill_tool"
 
-    return "whitelist_violation"
+    return "tool_not_available"
 
 
 def handle_pre_tool_use(input_data: dict[str, Any]) -> dict[str, Any]:

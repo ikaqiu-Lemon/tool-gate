@@ -227,6 +227,116 @@ class TestBuildIndex:
         index = indexer.build_index()
         assert "no-fm" not in index
 
+    def test_parse_initial_stage(self, tmp_path: Path) -> None:
+        """Verify initial_stage is parsed from frontmatter."""
+        d = tmp_path / "staged-skill"
+        d.mkdir()
+        (d / "SKILL.md").write_text(
+            '---\n'
+            'name: Staged Skill\n'
+            'initial_stage: diagnosis\n'
+            'stages:\n'
+            '  - stage_id: diagnosis\n'
+            '    allowed_tools: [Read]\n'
+            '  - stage_id: execution\n'
+            '    allowed_tools: [Write]\n'
+            '---\n\nbody',
+            encoding="utf-8",
+        )
+        indexer = SkillIndexer(tmp_path)
+        index = indexer.build_index()
+        assert index["staged-skill"].initial_stage == "diagnosis"
+
+    def test_parse_allowed_next_stages(self, tmp_path: Path) -> None:
+        """Verify allowed_next_stages is parsed from stage definitions."""
+        d = tmp_path / "workflow-skill"
+        d.mkdir()
+        (d / "SKILL.md").write_text(
+            '---\n'
+            'name: Workflow Skill\n'
+            'stages:\n'
+            '  - stage_id: analysis\n'
+            '    allowed_tools: [Read]\n'
+            '    allowed_next_stages: [execution, abort]\n'
+            '  - stage_id: execution\n'
+            '    allowed_tools: [Write]\n'
+            '    allowed_next_stages: [verify]\n'
+            '  - stage_id: verify\n'
+            '    allowed_tools: [Read]\n'
+            '    allowed_next_stages: []\n'
+            '  - stage_id: abort\n'
+            '    allowed_tools: []\n'
+            '    allowed_next_stages: []\n'
+            '---\n\nbody',
+            encoding="utf-8",
+        )
+        indexer = SkillIndexer(tmp_path)
+        index = indexer.build_index()
+        meta = index["workflow-skill"]
+        assert meta.stages[0].allowed_next_stages == ["execution", "abort"]
+        assert meta.stages[1].allowed_next_stages == ["verify"]
+        assert meta.stages[2].allowed_next_stages == []
+        assert meta.stages[3].allowed_next_stages == []
+
+    def test_terminal_stage_preserved(self, tmp_path: Path) -> None:
+        """Verify allowed_next_stages: [] is preserved as empty list (terminal stage)."""
+        d = tmp_path / "terminal-skill"
+        d.mkdir()
+        (d / "SKILL.md").write_text(
+            '---\n'
+            'name: Terminal Skill\n'
+            'stages:\n'
+            '  - stage_id: complete\n'
+            '    allowed_tools: [Read]\n'
+            '    allowed_next_stages: []\n'
+            '---\n\nbody',
+            encoding="utf-8",
+        )
+        indexer = SkillIndexer(tmp_path)
+        index = indexer.build_index()
+        stage = index["terminal-skill"].stages[0]
+        assert stage.allowed_next_stages == []
+        assert stage.allowed_next_stages is not None
+
+    def test_skill_without_stages_remains_valid(self, tmp_path: Path) -> None:
+        """Verify skills without stages field remain valid."""
+        d = tmp_path / "simple-skill"
+        d.mkdir()
+        (d / "SKILL.md").write_text(
+            '---\n'
+            'name: Simple Skill\n'
+            'allowed_tools: [Read, Write]\n'
+            '---\n\nbody',
+            encoding="utf-8",
+        )
+        indexer = SkillIndexer(tmp_path)
+        index = indexer.build_index()
+        meta = index["simple-skill"]
+        assert meta.stages == []
+        assert meta.allowed_tools == ["Read", "Write"]
+        assert meta.initial_stage is None
+
+    def test_skill_with_stages_but_no_initial_stage(self, tmp_path: Path) -> None:
+        """Verify skills with stages but no initial_stage are valid."""
+        d = tmp_path / "no-initial"
+        d.mkdir()
+        (d / "SKILL.md").write_text(
+            '---\n'
+            'name: No Initial\n'
+            'stages:\n'
+            '  - stage_id: first\n'
+            '    allowed_tools: [Read]\n'
+            '  - stage_id: second\n'
+            '    allowed_tools: [Write]\n'
+            '---\n\nbody',
+            encoding="utf-8",
+        )
+        indexer = SkillIndexer(tmp_path)
+        index = indexer.build_index()
+        meta = index["no-initial"]
+        assert len(meta.stages) == 2
+        assert meta.initial_stage is None
+
 
 # ---------------------------------------------------------------------------
 # SkillIndexer.list_skills / read_skill / refresh
@@ -282,6 +392,137 @@ class TestListAndRead:
         count = indexer.refresh()
         assert count == 3
         assert any(s.skill_id == "new-skill" for s in indexer.list_skills())
+
+    def test_read_skill_exposes_initial_stage(self, tmp_path: Path) -> None:
+        """read_skill must expose initial_stage in metadata."""
+        d = tmp_path / "staged-skill"
+        d.mkdir()
+        (d / "SKILL.md").write_text(
+            '---\n'
+            'name: Staged Skill\n'
+            'initial_stage: diagnosis\n'
+            'stages:\n'
+            '  - stage_id: diagnosis\n'
+            '    allowed_tools: [Read]\n'
+            '  - stage_id: execution\n'
+            '    allowed_tools: [Write]\n'
+            '---\n\nSOP body',
+            encoding="utf-8",
+        )
+        indexer = SkillIndexer(tmp_path)
+        indexer.build_index()
+        content = indexer.read_skill("staged-skill")
+        assert content is not None
+        assert content.metadata.initial_stage == "diagnosis"
+        assert content.sop == "SOP body"
+
+    def test_read_skill_exposes_allowed_next_stages(self, tmp_path: Path) -> None:
+        """read_skill must expose allowed_next_stages for each stage."""
+        d = tmp_path / "workflow-skill"
+        d.mkdir()
+        (d / "SKILL.md").write_text(
+            '---\n'
+            'name: Workflow Skill\n'
+            'stages:\n'
+            '  - stage_id: analysis\n'
+            '    allowed_tools: [Read]\n'
+            '    allowed_next_stages: [execution, abort]\n'
+            '  - stage_id: execution\n'
+            '    allowed_tools: [Write]\n'
+            '    allowed_next_stages: [verify]\n'
+            '  - stage_id: verify\n'
+            '    allowed_tools: [Read]\n'
+            '    allowed_next_stages: []\n'
+            '  - stage_id: abort\n'
+            '    allowed_tools: []\n'
+            '    allowed_next_stages: []\n'
+            '---\n\nWorkflow SOP',
+            encoding="utf-8",
+        )
+        indexer = SkillIndexer(tmp_path)
+        indexer.build_index()
+        content = indexer.read_skill("workflow-skill")
+        assert content is not None
+        assert len(content.metadata.stages) == 4
+        assert content.metadata.stages[0].allowed_next_stages == ["execution", "abort"]
+        assert content.metadata.stages[1].allowed_next_stages == ["verify"]
+        assert content.metadata.stages[2].allowed_next_stages == []
+        assert content.metadata.stages[3].allowed_next_stages == []
+
+    def test_read_skill_terminal_stage_preserved(self, tmp_path: Path) -> None:
+        """read_skill must preserve empty list for terminal stages."""
+        d = tmp_path / "terminal-skill"
+        d.mkdir()
+        (d / "SKILL.md").write_text(
+            '---\n'
+            'name: Terminal Skill\n'
+            'stages:\n'
+            '  - stage_id: final\n'
+            '    allowed_tools: [Read]\n'
+            '    allowed_next_stages: []\n'
+            '---\n\nFinal stage',
+            encoding="utf-8",
+        )
+        indexer = SkillIndexer(tmp_path)
+        indexer.build_index()
+        content = indexer.read_skill("terminal-skill")
+        assert content is not None
+        assert content.metadata.stages[0].allowed_next_stages == []
+        # Verify it's an empty list, not None
+        assert isinstance(content.metadata.stages[0].allowed_next_stages, list)
+
+    def test_read_skill_non_staged_skill_exposes_allowed_tools(self, tmp_path: Path) -> None:
+        """read_skill on non-staged skill must expose skill-level allowed_tools."""
+        d = tmp_path / "simple-skill"
+        d.mkdir()
+        (d / "SKILL.md").write_text(
+            '---\n'
+            'name: Simple Skill\n'
+            'allowed_tools: [Read, Write]\n'
+            '---\n\nSimple SOP',
+            encoding="utf-8",
+        )
+        indexer = SkillIndexer(tmp_path)
+        indexer.build_index()
+        content = indexer.read_skill("simple-skill")
+        assert content is not None
+        assert content.metadata.allowed_tools == ["Read", "Write"]
+        assert content.metadata.stages == []
+        assert content.metadata.initial_stage is None
+
+    def test_read_skill_serialization_includes_new_fields(self, tmp_path: Path) -> None:
+        """Verify model_dump() includes initial_stage and allowed_next_stages."""
+        d = tmp_path / "full-skill"
+        d.mkdir()
+        (d / "SKILL.md").write_text(
+            '---\n'
+            'name: Full Skill\n'
+            'initial_stage: start\n'
+            'stages:\n'
+            '  - stage_id: start\n'
+            '    allowed_tools: [Read]\n'
+            '    allowed_next_stages: [end]\n'
+            '  - stage_id: end\n'
+            '    allowed_tools: [Write]\n'
+            '    allowed_next_stages: []\n'
+            '---\n\nFull workflow',
+            encoding="utf-8",
+        )
+        indexer = SkillIndexer(tmp_path)
+        indexer.build_index()
+        content = indexer.read_skill("full-skill")
+        assert content is not None
+
+        # Serialize to dict (same as MCP server does)
+        data = content.model_dump()
+
+        # Verify new fields are present in serialized output
+        assert "initial_stage" in data["metadata"]
+        assert data["metadata"]["initial_stage"] == "start"
+        assert len(data["metadata"]["stages"]) == 2
+        assert "allowed_next_stages" in data["metadata"]["stages"][0]
+        assert data["metadata"]["stages"][0]["allowed_next_stages"] == ["end"]
+        assert data["metadata"]["stages"][1]["allowed_next_stages"] == []
 
 
 # ---------------------------------------------------------------------------

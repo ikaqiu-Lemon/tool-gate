@@ -1,7 +1,7 @@
-{"type": "hook.session_start", "timestamp": "2026-05-03T06:13:47.358980", "session_id": "scenario-03"}
-{"type": "hook.user_prompt_submit", "timestamp": "2026-05-03T06:13:47.615798", "session_id": "scenario-03"}
-{"type": "hook.pre_tool_use", "timestamp": "2026-05-03T06:13:47.813786", "tool_name": "mcp__mock-yuque__yuque_search", "decision": "unknown"}
-{"type": "mcp.enable_skill", "timestamp": "2026-05-03T06:13:47.820486", "skill_id": "yuque-knowledge-link", "reason": null}
-{"type": "hook.user_prompt_submit", "timestamp": "2026-05-03T06:13:48.031842", "session_id": "scenario-03"}
-{"type": "mcp.disable_skill", "timestamp": "2026-05-03T06:13:48.039451", "skill_id": "yuque-knowledge-link"}
-{"type": "mcp.enable_skill", "timestamp": "2026-05-03T06:13:48.046532", "skill_id": "yuque-comment-sync", "reason": "Need to sync comments for analysis"}
+{"type": "hook.session_start", "timestamp": "2026-05-03T14:26:02.863036", "session_id": "scenario-03"}
+{"type": "hook.user_prompt_submit", "timestamp": "2026-05-03T14:26:03.178216", "session_id": "scenario-03"}
+{"type": "hook.pre_tool_use", "timestamp": "2026-05-03T14:26:03.501938", "tool_name": "mcp__mock-yuque__yuque_search", "decision": "unknown"}
+{"type": "mcp.enable_skill", "timestamp": "2026-05-03T14:26:03.508609", "skill_id": "yuque-knowledge-link", "reason": null}
+{"type": "hook.user_prompt_submit", "timestamp": "2026-05-03T14:26:03.758566", "session_id": "scenario-03"}
+{"type": "mcp.disable_skill", "timestamp": "2026-05-03T14:26:03.765375", "skill_id": "yuque-knowledge-link"}
+{"type": "mcp.enable_skill", "timestamp": "2026-05-03T14:26:03.771437", "skill_id": "yuque-comment-sync", "reason": "Need to sync comments for analysis"}

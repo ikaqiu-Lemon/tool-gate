@@ -145,7 +145,7 @@ python -m pytest tests/functional/test_functional_ttl.py -q
 | File | Tests | Pipeline node(s) |
 |---|---|---|
 | `test_functional_happy_path.py` | 7 | SessionStart → list → read → enable → UserPromptSubmit → run_skill_action → PostToolUse |
-| `test_functional_gating.py` | 4 | PreToolUse deny (+ meta-tool allow fast-path, `whitelist_violation` audit, MCP-namespaced deny) |
+| `test_functional_gating.py` | 4 | PreToolUse deny (+ meta-tool allow fast-path, `tool_not_available` audit, MCP-namespaced deny) |
 | `test_functional_stage.py` | 1 | `change_stage` + `stage.change` audit |
 | `test_functional_ttl.py` | 2 | TTL expiry blocks `run_skill_action`; UserPromptSubmit sweep emits `grant.expire` (not `grant.revoke`) |
 | `test_functional_refresh.py` | 2 | `refresh_skills` visibility + single `build_index` call (D3) |

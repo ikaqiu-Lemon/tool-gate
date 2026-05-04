@@ -53,7 +53,7 @@ Tool-Gate adds a **governance runtime** between Claude and its tools.
 | **Explicit Grants** | A skill must be enabled before its tools become available | Keeps permission boundaries clear |
 | **Stage-Based Access** | The same skill can expose different tools in different stages | Supports “understand first, modify later” workflows |
 | **Per-Turn Recompute** | `active_tools` is recomputed on every user turn | Prevents stale state and leaked permissions |
-| **Hard Runtime Guardrails** | `PreToolUse` blocks calls outside the whitelist | Enforces real boundaries, not just hints |
+| **Hard Runtime Guardrails** | `PreToolUse` blocks calls outside the runtime available tool set | Enforces real boundaries, not just hints |
 | **Auditability** | Skill read, enable, revoke, stage changes, and tool calls are logged | Makes decisions explainable and reviewable |
 | **SQLite WAL Persistence** | Hooks and MCP server share state through local SQLite | Reliable local coordination without extra infrastructure |
 | **Plugin-Native Design** | Built around Claude Code plugin conventions | Easy local testing and future distribution |
@@ -213,7 +213,7 @@ enable_skill("code-edit")
 
 ### Layer 3 — Done
 - End-to-end observability (`audit_log` funnel queries via `SQLiteStore.funnel_counts`)
-- Funnel metrics and richer error bucketing (`whitelist_violation` / `wrong_skill_tool` / `parameter_error`)
+- Funnel metrics and richer error bucketing (`tool_not_available` / `wrong_skill_tool` / `parameter_error`)
 - Optional Langfuse integration with graceful no-op fallback
 - Release polish: ruff + mypy + coverage + micro-benchmarks
 
@@ -374,7 +374,7 @@ flowchart TD
     D --> E["Compose additionalContext<br/>(catalog + tools + guidance)"]
     E --> F["Inject into model context"]
     F --> G["Model responds with tool calls"]
-    G --> H["PreToolUse: check whitelist"]
+    G --> H["PreToolUse: check active_tools"]
     H -->|allow| I["Tool executes"]
     H -->|deny| J["Guidance: use enable_skill flow"]
     I --> K["PostToolUse: audit + last_used_at"]
@@ -413,7 +413,7 @@ Workflow description and rules here (Markdown body = SOP).
 | `name` | Yes | Display name |
 | `description` | Yes | Short description (truncated at 500 chars) |
 | `risk_level` | No | `low` (auto-grant), `medium` (needs reason), `high` (needs approval) |
-| `allowed_tools` | No | Tool whitelist (used when no stages defined) |
+| `allowed_tools` | No | Tool list (used when no stages defined) |
 | `stages` | No | Stage definitions, each with its own `allowed_tools` |
 | `allowed_ops` | No | Operations available via `run_skill_action` |
 

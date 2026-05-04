@@ -11,11 +11,14 @@ stages:
     allowed_tools:
       - mock_read
       - mock_glob
+    allowed_next_stages:
+      - execution
   - stage_id: execution
     description: "Write stage."
     allowed_tools:
       - mock_edit
       - mock_write
+    allowed_next_stages: []
 default_ttl: 3600
 version: "1.0.0"
 ---

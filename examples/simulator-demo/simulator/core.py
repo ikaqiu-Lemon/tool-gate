@@ -191,12 +191,13 @@ class ClaudeCodeSimulator:
         })
         return result
 
-    async def enable_skill(self, skill_id: str, reason: Optional[str] = None) -> Dict[str, Any]:
+    async def enable_skill(self, skill_id: str, reason: Optional[str] = None, ttl: Optional[int] = None) -> Dict[str, Any]:
         """Call enable_skill MCP tool.
 
         Args:
             skill_id: Skill to enable
             reason: Optional reason for enablement
+            ttl: Optional TTL in seconds for the grant
 
         Returns:
             MCP tool result
@@ -207,6 +208,8 @@ class ClaudeCodeSimulator:
         arguments = {"skill_id": skill_id}
         if reason:
             arguments["reason"] = reason
+        if ttl is not None:
+            arguments["ttl"] = ttl
 
         result = await self._mcp_subprocess.call_tool("enable_skill", arguments)
         self._events.append({
@@ -214,6 +217,7 @@ class ClaudeCodeSimulator:
             "timestamp": datetime.utcnow().isoformat(),
             "skill_id": skill_id,
             "reason": reason,
+            "ttl": ttl,
         })
         return result
 
@@ -302,10 +306,10 @@ class ClaudeCodeSimulator:
         """Read current state from SQLite governance.db.
 
         Returns:
-            Dict containing sessions, grants, and audit_log entries
+            Dict containing sessions, grants, audit_log entries, and parsed session state
         """
         if not self.db_path.exists():
-            return {"sessions": [], "grants": [], "audit_log": []}
+            return {"sessions": [], "grants": [], "audit_log": [], "skills_loaded": {}}
 
         conn = sqlite3.connect(str(self.db_path))
         conn.row_factory = sqlite3.Row
@@ -315,6 +319,17 @@ class ClaudeCodeSimulator:
             # Read sessions
             cursor.execute("SELECT * FROM sessions WHERE session_id = ?", (self.session_id,))
             sessions = [dict(row) for row in cursor.fetchall()]
+
+            # Parse session state JSON to extract skills_loaded
+            import json
+            skills_loaded = {}
+            if sessions:
+                state_json = sessions[0].get('state_json', '{}')
+                try:
+                    state_data = json.loads(state_json)
+                    skills_loaded = state_data.get('skills_loaded', {})
+                except json.JSONDecodeError:
+                    pass
 
             # Read grants
             cursor.execute("SELECT * FROM grants WHERE session_id = ?", (self.session_id,))
@@ -328,6 +343,7 @@ class ClaudeCodeSimulator:
                 "sessions": sessions,
                 "grants": grants,
                 "audit_log": audit_log,
+                "skills_loaded": skills_loaded,
             }
         finally:
             conn.close()

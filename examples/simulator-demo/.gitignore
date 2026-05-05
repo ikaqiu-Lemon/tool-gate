@@ -1,0 +1,16 @@
+# Generated scenario artifacts (runtime outputs, not source)
+.scenario-*-data/
+.verify-data/
+.test-*/
+
+# Specific artifact file patterns
+events.jsonl
+audit_summary.md
+metrics.json
+governance.db
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd

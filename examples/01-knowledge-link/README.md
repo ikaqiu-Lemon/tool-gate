@@ -1,5 +1,13 @@
 # 样例 01 · 知识关联:首次发现与自动授权
 
+> [!WARNING]
+> **Deprecated / Legacy Example**
+>
+> 本样例保留用于历史参考和 pre-Stage-first 演示。它**不是** Stage-first governance 的 canonical demo。
+>
+> 如需了解当前 Stage-first Skill governance 流程，请从 [`examples/simulator-demo`](../simulator-demo/) 开始。
+> 不建议新用户使用本样例学习 Stage-first governance。
+
 > 本样例展示 tool-gate 的**基础主流程**:一个新会话中,Claude 如何被引导从"看到技能目录 → 阅读 SOP → 启用技能 → 使用工具"一步步走过来;在这条链路上,**混杂工具会被真实拦住**。
 
 > ⚠️ **Preflight**:本 workspace **不负责**项目安装。先读 [`../QUICKSTART.md`](../QUICKSTART.md)(§1 概念 + wiring / §2 零知识安装 / §7 preflight 自检),按 §2 在**仓库根**完成一次性安装之后再回来跑本样例。workspace 目录仅负责 demo run。

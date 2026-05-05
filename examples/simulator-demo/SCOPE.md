@@ -2,12 +2,38 @@
 
 This document maps the three existing examples to simulator demo capabilities, establishing clear boundaries for what the simulator will demonstrate.
 
-## Example-to-Scenario Mapping
+## Skill Fixtures
 
-### Example 01: knowledge-link → Scenario 01: Discovery
+The simulator uses two skill fixtures in `fixtures/skills/` to demonstrate Stage-first governance:
 
-**Example 01 demonstrates**:
-- Low-risk skill with auto-grant (no reason required)
+### yuque-doc-edit-staged (Staged Skill)
+
+A three-stage skill demonstrating Stage-first governance:
+- **initial_stage**: `analysis`
+- **Stages**: `analysis` → `execution` → `verification`
+- **Terminal stage**: `verification` has `allowed_next_stages: []`, blocking further transitions
+- **Stage-specific tools**: Each stage defines its own `allowed_tools` list
+- **Demonstrates**: Stage transition governance, terminal stage behavior, stage-aware tool filtering
+
+### yuque-knowledge-link (No-Stage Skill)
+
+A no-stage skill demonstrating backward compatibility:
+- **No stages field**: Uses `allowed_tools` directly at skill level
+- **No initial_stage**: Falls back to skill-level tool authorization
+- **Demonstrates**: Backward compatibility for skills that don't adopt Stage-first model
+
+## Scenario Coverage
+
+### Scenario 01: Stage-first Discovery and Metadata
+
+**Validates**:
+- `list_skills` discovers both staged and no-stage skills
+- `read_skill` returns complete stage workflow metadata (initial_stage, stages, allowed_tools, allowed_next_stages)
+- No-stage skills show fallback behavior (skill-level allowed_tools)
+- Terminal stages identified via `allowed_next_stages: []`
+- Unauthorized tools denied with `tool_not_available`
+
+**Uses**: Both skill fixtures (yuque-doc-edit-staged, yuque-knowledge-link)
 - Basic discovery flow: list_skills → read_skill → enable_skill
 - Whitelist enforcement: allowed tools pass, unauthorized tools denied
 - Mixed MCP environment: multiple MCP servers registered, only enabled skill's tools allowed
@@ -31,34 +57,17 @@ This document maps the three existing examples to simulator demo capabilities, e
 
 ---
 
-### Example 02: doc-edit-staged → Scenario 02: Staged Workflow
+### Scenario 02: Stage Transition Governance
 
-**Example 02 demonstrates**:
-- Medium-risk skill with require_reason enforcement
-- Two-stage workflow: analysis (read-only) → execution (write)
-- Stage-aware tool filtering: different tools per stage
-- change_stage mechanics and audit trail
-- blocked_tools global red line (run_command always denied)
+**Validates**:
+- `enable_skill` enters `initial_stage` automatically
+- `active_tools` reflects only current stage's `allowed_tools`
+- Legal transitions succeed (analysis → execution within `allowed_next_stages`)
+- Illegal transitions denied with `stage_transition_not_allowed` (execution → analysis not in `allowed_next_stages`)
+- Audit events: `stage.transition.allow`, `stage.transition.deny`
+- Stage state persists to SQLite (`current_stage`, `stage_history`, `exited_stages`)
 
-**Maps to Scenario 02 (Staged)**:
-- enable_skill("yuque-doc-edit") without reason → deny (reason_missing)
-- enable_skill("yuque-doc-edit", reason="...") → grant with stage=analysis
-- UserPromptSubmit → active_tools = analysis stage tools
-- PreToolUse("yuque_get_doc") → allow (in analysis stage)
-- PreToolUse("yuque_update_doc") → deny (not in analysis stage)
-- change_stage("yuque-doc-edit", "execution") (MCP meta-tool)
-- UserPromptSubmit → active_tools = execution stage tools
-- PreToolUse("yuque_update_doc") → allow (in execution stage)
-- PreToolUse("run_command") → deny (blocked_tools, global red line)
-
-**Governance behaviors demonstrated**:
-- require_reason enforcement (deny without reason, grant with reason)
-- Stage transitions via change_stage
-- Stage-aware tool filtering
-- blocked_tools global red line (overrides any skill authorization)
-- Audit trail: skill.enable (denied), skill.enable (granted), stage.change, tool.call (deny/allow)
-
----
+**Uses**: yuque-doc-edit-staged (three-stage workflow)
 
 ### Example 03: lifecycle-and-risk → Scenario 03: Lifecycle and Risk
 
@@ -75,14 +84,17 @@ This document maps the three existing examples to simulator demo capabilities, e
 - PreToolUse("yuque_search") → deny (expired skill, tool_not_available)
 - enable_skill("yuque-knowledge-link") → re-grant (low risk, auto)
 - disable_skill("yuque-doc-edit") → grant.revoke + skill.disable (strict ordering)
-- enable_skill("yuque-bulk-delete") → deny (approval_required, high risk)
+### Scenario 03: Lifecycle, Terminal Stages, and Expiration
 
-**Governance behaviors demonstrated**:
-- TTL expiration and automatic cleanup
-- Grant revocation with strict audit ordering (revoke before disable)
-- High-risk skill denial (approval_required)
-- Re-authorization after expiration
-- Audit trail: grant.expire, skill.enable (granted), grant.revoke, skill.disable, skill.enable (denied)
+**Validates**:
+- Full stage lifecycle (analysis → execution → verification)
+- Terminal stage blocks further transitions (verification has `allowed_next_stages: []`)
+- Stage state persistence and restoration from SQLite
+- Expired grants (TTL elapsed) do not contribute tools to `active_tools`
+- `disable_skill` removes tools from `active_tools`
+- Audit events: `stage.transition.allow`, `stage.transition.deny`, `grant.expire`, `skill.disable`
+
+**Uses**: yuque-doc-edit-staged (terminal stage: verification), yuque-knowledge-link (for TTL expiration test)
 
 ---
 
@@ -104,21 +116,22 @@ These elements appear in all three scenarios and form the core governance chain:
 ## Scenario-Specific Capabilities
 
 ### Scenario 01 Only
-- Auto-grant for low-risk skills
-- Mixed MCP environment demonstration
-- Basic tool_not_available (unauthorized tool from different MCP)
+- Discovery of staged and no-stage skills
+- Stage-first metadata validation (initial_stage, stages, allowed_tools)
+- No-stage skill fallback behavior (skill-level allowed_tools)
+- Unauthorized tool rejection (tool_not_available)
 
 ### Scenario 02 Only
-- require_reason enforcement
-- Stage transitions (analysis → execution)
-- Stage-aware tool filtering
-- blocked_tools global red line
+- Initial stage entry on enable_skill
+- Stage transition governance (legal vs illegal transitions)
+- Active tools change with current_stage
+- Stage state persistence (current_stage, stage_history, exited_stages)
 
 ### Scenario 03 Only
-- TTL expiration and cleanup
-- Grant revocation with strict ordering
-- High-risk skill denial (approval_required)
-- Re-authorization after expiration
+- Full stage lifecycle (analysis → execution → verification)
+- Terminal stage blocks further transitions
+- Expired grants do not contribute tools to active_tools
+- disable_skill removes tools from active_tools
 
 ---
 
@@ -126,25 +139,35 @@ These elements appear in all three scenarios and form the core governance chain:
 
 To prevent scope creep, the simulator explicitly does NOT:
 
-1. **Implement new governance features**: Only demonstrates existing capabilities from examples
-2. **Replace existing examples**: Examples 01, 02, 03 remain the canonical end-to-end demos
+1. **Implement new governance features**: Only demonstrates existing Stage-first capabilities
+2. **Replace existing examples**: Legacy examples remain for historical reference
 3. **Modify src/ implementation**: Uses existing tg-hook and tg-mcp binaries as-is
 4. **Create a testing framework**: This is a demonstration tool, not a test harness
-5. **Support arbitrary scenarios**: Only the three scenarios derived from examples
+5. **Support arbitrary scenarios**: Only the three scenarios demonstrating Stage-first governance
 6. **Mock subprocess communication**: Uses real tg-hook and tg-mcp subprocesses
-7. **Invent new skills or policies**: Reuses skills and policies from examples
+7. **Clean up expired grants from skills_loaded**: Expired grants are filtered at runtime but remain in persisted state until explicit cleanup
 
 ---
 
 ## Scope Boundaries
 
 **In Scope**:
-- Demonstrate subprocess isolation (real tg-hook and tg-mcp processes)
-- Validate protocol correctness (JSON-RPC for hooks, stdio for MCP)
+- Demonstrate Stage-first governance (stage workflow metadata, transitions, terminal stages)
+- Validate subprocess isolation (real tg-hook and tg-mcp processes)
+- Verify protocol correctness (hook stdin/stdout, MCP stdio)
 - Verify shared state integrity (SQLite WAL coordination)
-- Generate complete audit trails (all 9 event types)
-- Support three core scenarios (discovery, staged, lifecycle)
+- Generate complete audit trails (stage.transition.allow/deny, grant.expire, tool.call)
+- Support three core scenarios (discovery, transition governance, lifecycle)
 - Provide verification mechanisms (audit completeness, state consistency)
+
+**Out of Scope**:
+- Core runtime refactoring (src/tool_governance/)
+- Legacy example migration or deletion
+- Fourth scenario or custom scenario support
+- Tool registry, Redis, or workflow engine integration
+- Complex human approval workflows
+- Runtime unit test refactoring
+- Bug fixes in core runtime (unless directly blocking demo acceptance)
 
 **Out of Scope**:
 - New governance features or capabilities

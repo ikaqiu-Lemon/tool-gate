@@ -30,10 +30,23 @@ echo "✓ Scenario 03 complete"
 echo ""
 
 echo "=========================================="
+echo "Running Stage-first Governance Verification"
+echo "=========================================="
+python3 verify_stage_first.py
+VERIFY_EXIT=$?
+
+echo ""
+echo "=========================================="
 echo "Summary Report"
 echo "=========================================="
 echo ""
-echo "All three scenarios completed successfully."
+if [ $VERIFY_EXIT -eq 0 ]; then
+    echo "✅ All three scenarios completed successfully."
+    echo "✅ All Stage-first governance checks passed."
+else
+    echo "❌ Verification FAILED - see errors above"
+    exit 1
+fi
 echo ""
 echo "Generated artifacts:"
 echo "  - .scenario-01-data/ (Discovery)"
@@ -46,6 +59,6 @@ echo "  - events.jsonl (Complete event trace)"
 echo "  - audit_summary.md (Human-readable summary)"
 echo "  - metrics.json (Event statistics)"
 echo ""
-echo "To verify governance event coverage:"
-echo "  python verify_stage_d.py"
+echo "To re-run verification only:"
+echo "  python3 verify_stage_first.py"
 echo ""

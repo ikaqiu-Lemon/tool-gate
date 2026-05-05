@@ -617,7 +617,44 @@ Comprehensive workflow for diagnosing and fixing database performance issues.
 
 ---
 
-## 11. Runtime Enforcement (Future Work)
+## 11. Complete Examples
+
+For reference implementations demonstrating Stage-first governance patterns:
+
+### Staged Skill Example
+
+[`examples/simulator-demo/fixtures/skills/yuque-doc-edit-staged/SKILL.md`](../examples/simulator-demo/fixtures/skills/yuque-doc-edit-staged/SKILL.md)
+
+Demonstrates:
+- `initial_stage: analysis` — safe read-only entry point
+- Three-stage workflow: `analysis` → `execution` → `verification`
+- Terminal stage: `verification` with `allowed_next_stages: []`
+- Stage-level `allowed_tools` with progressive disclosure
+
+### No-Stage Skill Example
+
+[`examples/simulator-demo/fixtures/skills/yuque-knowledge-link/SKILL.md`](../examples/simulator-demo/fixtures/skills/yuque-knowledge-link/SKILL.md)
+
+Demonstrates:
+- Skill-level `allowed_tools` (no stages) — fully supported, non-deprecated format
+- Simple read-only workflow with uniform tool requirements
+
+### Stage Transition Governance
+
+[`examples/simulator-demo/scenarios/scenario_02_staged.py`](../examples/simulator-demo/scenarios/scenario_02_staged.py)
+
+Demonstrates:
+- Legal transitions: `change_stage` to stages in `allowed_next_stages`
+- Illegal transitions: `change_stage` to stages NOT in `allowed_next_stages`
+- Audit events: `stage.transition.allow` and `stage.transition.deny`
+
+### Complete Demo
+
+[`examples/simulator-demo/`](../examples/simulator-demo/) — Canonical Stage-first governance acceptance demo with subprocess isolation, stage workflow metadata, stage transition governance, terminal stages, and complete audit trail.
+
+---
+
+## 12. Runtime Enforcement (Future Work)
 
 **Note**: The metadata fields defined in this document (`initial_stage`, `allowed_next_stages`, terminal stages) establish the **governance contract** but do not yet enforce runtime behavior.
 
@@ -643,7 +680,7 @@ Until then, the metadata serves as **documentation and design intent** for skill
 
 ---
 
-## 12. Summary
+## 13. Summary
 
 ### Key Takeaways
 

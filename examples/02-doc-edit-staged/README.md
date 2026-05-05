@@ -1,5 +1,13 @@
 # 样例 02 · 受控编辑:分阶段与 blocked_tools
 
+> [!WARNING]
+> **Deprecated / Legacy Example**
+>
+> 本样例保留用于历史参考和 pre-Stage-first 演示。它**不是** Stage-first governance 的 canonical demo。
+>
+> 如需了解当前 Stage-first Skill governance 流程，请从 [`examples/simulator-demo`](../simulator-demo/) 开始。
+> 不建议新用户使用本样例学习 Stage-first governance。
+
 > 本样例展示 tool-gate 在**中风险 + 需要写入**的场景下如何落地"先理解、再修改"的两阶段工作流,同时通过 `blocked_tools` 演示全局红线。
 
 > ⚠️ **Preflight**:本 workspace **不负责**项目安装。先读 [`../QUICKSTART.md`](../QUICKSTART.md)(§1 概念 + wiring / §2 零知识安装 / §7 preflight 自检),按 §2 在**仓库根**完成一次性安装之后再回来跑本样例。workspace 目录仅负责 demo run。

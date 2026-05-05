@@ -133,10 +133,21 @@ class MCPSubprocess:
             import json
 
             if result.content:
-                # MCP returns list of content blocks, extract first text block
+                # MCP returns list of content blocks
+                # For list_skills, each block is a separate skill dict
+                # For other tools, typically one block with the full result
+                text_blocks = []
                 for block in result.content:
                     if hasattr(block, 'text'):
-                        return json.loads(block.text)
+                        text_blocks.append(block.text)
+
+                # If only one block, parse and return it directly
+                if len(text_blocks) == 1:
+                    return json.loads(text_blocks[0])
+
+                # If multiple blocks, parse each and return as list
+                if len(text_blocks) > 1:
+                    return [json.loads(text) for text in text_blocks]
 
             # If no text content, return the raw result structure
             return {

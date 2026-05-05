@@ -279,8 +279,8 @@ claude plugin validate /path/to/tool-gate
 - `README.md` — English overview
 - `README_CN.md` — Chinese overview
 - `docs/` — design notes, requirements, and development plan
-- [`examples/`](./examples/) — delivery demo workspaces (three self-contained scenarios covering the full governance pipeline)
-- [`examples/simulator-demo/`](./examples/simulator-demo/) — Claude Code call chain simulator (subprocess isolation, protocol boundaries, SQLite shared state, complete audit trail)
+- [`examples/`](./examples/) — delivery demo workspaces (see [`simulator-demo/`](./examples/simulator-demo/) for Stage-first governance acceptance)
+- [`examples/simulator-demo/`](./examples/simulator-demo/) — **Canonical Stage-first governance demo** (subprocess isolation, stage workflow metadata, stage transition governance, terminal stages, complete audit trail)
 
 ---
 

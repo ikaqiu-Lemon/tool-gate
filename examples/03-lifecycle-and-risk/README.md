@@ -1,5 +1,13 @@
 # 样例 03 · 会话生命周期与风险升级
 
+> [!WARNING]
+> **Deprecated / Legacy Example**
+>
+> 本样例保留用于历史参考和 pre-Stage-first 演示。它**不是** Stage-first governance 的 canonical demo。
+>
+> 如需了解当前 Stage-first Skill governance 流程，请从 [`examples/simulator-demo`](../simulator-demo/) 开始。
+> 不建议新用户使用本样例学习 Stage-first governance。
+
 > 本样例展示 tool-gate 在**长会话**中的能力**回收**与**风险升级**机制。主线围绕 TTL / revoke / disable / 高风险审批 / 审计闭环展开;`refresh_skills` 不在主线(其主场景在[样例 01 的附录](../01-knowledge-link/README.md#附录--refresh_skills-插曲)),本样例仅在末尾做一次辅助复核触发。
 
 > ⚠️ **Preflight**:本 workspace **不负责**项目安装。先读 [`../QUICKSTART.md`](../QUICKSTART.md)(§1 概念 + wiring / §2 零知识安装 / §7 preflight 自检),按 §2 在**仓库根**完成一次性安装之后再回来跑本样例。workspace 目录仅负责 demo run。

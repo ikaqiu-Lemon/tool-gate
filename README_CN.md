@@ -13,7 +13,7 @@
   <img alt="Claude Code Plugin" src="https://img.shields.io/badge/Claude%20Code-Plugin-6f42c1" />
   <img alt="Architecture" src="https://img.shields.io/badge/Architecture-双平面-0ea5e9" />
   <img alt="State" src="https://img.shields.io/badge/State-SQLite%20WAL-10b981" />
-  <img alt="Tests" src="https://img.shields.io/badge/Tests-104%2B-success" />
+  <img alt="Tests" src="https://img.shields.io/badge/Tests-290%2B-success" />
 </p>
 
 </div>
@@ -24,11 +24,22 @@
 
 Tool-Gate 是一个 **Claude Code 插件形态的运行时治理层**。
 
-它不是把所有工具一股脑都暴露给 Claude，而是采用一条更可控的流程：
+它不是把所有工具一股脑都暴露给 Claude，而是实现了 **Stage-first Skill Governance（阶段优先的技能治理）** 模型：
 
-**发现技能 → 阅读说明 → 显式启用 → 阶段切换 → 使用工具**
+- **Skills（技能）** 代表业务能力 / SOP（标准操作流程）
+- **Stages（阶段）** 代表技能内的工作流阶段
+- **Tools（工具）** 是每个阶段暴露的外部能力
 
-也就是说，Claude 先看到技能目录，再读 SOP，再启用技能，最后才拿到当前阶段真正需要的最小工具集。
+工作流遵循：
+
+**发现 → 阅读 → 启用 → 阶段推进 → 执行**
+
+Claude 先看到技能目录，读取 SOP，启用技能（进入 `initial_stage`），通过 `change_stage` 推进阶段，只获得当前阶段所需的工具。
+
+**核心治理公式**：
+```
+active_tools = META_TOOLS ∪ (已启用且有效授权的技能的 stage_tools) − blocked_tools
+```
 
 ---
 
@@ -49,12 +60,13 @@ Tool-Gate 的作用，就是在 Claude 和工具之间加上一层**运行时治
 
 | 能力 | 具体含义 | 价值 |
 |---|---|---|
+| **Stage-first Governance** | 技能定义 `initial_stage` 和 `allowed_next_stages`，运行时强制校验阶段转换 | 工作流结构化，防止跳过关键阶段 |
 | **渐进式披露** | Claude 先看到技能目录，而不是完整工具宇宙 | 降低上下文噪音和误调用 |
 | **显式授权** | 只有启用技能后，对应工具才会进入当前可用范围 | 权限边界更清晰 |
-| **Stage 分阶段暴露** | 同一个技能可以在不同阶段暴露不同工具 | 支持“先理解、后修改”的工作流 |
-| **每轮全量重算** | `active_tools` 在每一轮用户消息后重新计算 | 避免陈旧状态和权限泄漏 |
-| **运行时硬拦截** | `PreToolUse` 对白名单外工具直接拦截 | 不是光靠提示，而是真正有边界 |
-| **审计可追踪** | 读取技能、启用技能、切换阶段、工具调用都会记录 | 方便复查、分析和解释 |
+| **阶段转换校验** | `change_stage` 强制检查 `allowed_next_stages`，非法转换被拒绝 | 防止工作流跳跃和权限提升 |
+| **Terminal Stage 强制** | `allowed_next_stages: []` 的阶段阻断所有转换 | 支持”只读锁定”等终止状态 |
+| **Grant TTL** | 授权支持自然过期（TTL），过期后自动清理 | 时间限定的权限，减少手动撤销 |
+| **审计追踪** | 阶段转换、工具调用、授权生命周期全部记录到 SQLite | 完整可追溯的治理日志 |
 | **SQLite WAL 持久化** | Hook 与 MCP Server 通过本地 SQLite 共享状态 | 无需额外基础设施也能稳定协同 |
 | **原生插件形态** | 设计上对齐 Claude Code 插件方式 | 便于本地调试和后续分发 |
 
@@ -186,12 +198,18 @@ enable_skill("code-edit")
 
 ## 当前状态
 
+**版本**: v1.0.0 — Stage-first Skill Governance
+
 | 模块 | 状态 |
 |---|---|
-| **Phase 1–3 核心链路** | 已打通 |
-| **核心治理链** | `index → policy → grant → rewrite → gate` |
-| **测试** | 104+ 通过 |
-| **当前重点** | 收口修复、一致性清理、文档同步，之后再进入完整 Phase 4 |
+| **Stage-first Governance** | ✅ 完成 — Skills 作为工作流，Stages 作为阶段，Tools 跟随 SOP 推进 |
+| **核心治理链** | ✅ `Skill → Stage → Grant → RuntimeContext → active_tools → PreToolUse` |
+| **Stage 工作流元数据** | ✅ `initial_stage`、`allowed_next_stages`、terminal stages、no-stage fallback |
+| **运行时强制** | ✅ 阶段转换校验、terminal stage 阻断、过期 grant 过滤 |
+| **测试** | 290 通过（Phase 3 基线：104），核心模块覆盖率 ≥ 92% |
+| **代码质量** | `ruff` clean，`mypy --strict` clean on `src/tool_governance/` |
+| **性能基准** | Hook p95 < 1 ms，MCP p95 < 1 ms，skill-index 缓存命中率 99.5% |
+| **Demo** | [`simulator-demo`](./examples/simulator-demo/) — 规范 Stage-first 验收，真实子进程边界 |
 
 ---
 

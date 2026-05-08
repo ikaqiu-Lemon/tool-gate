@@ -24,11 +24,22 @@ Control what Claude can see, enable, and use — with **progressive disclosure**
 
 Tool-Gate is a **Claude Code plugin** that adds a governance runtime between Claude and the tools it can call.
 
-Instead of exposing every tool all the time, Tool-Gate follows a safer workflow:
+Instead of exposing every tool all the time, Tool-Gate implements **Stage-first Skill Governance** — a model where:
 
-**discover → read → enable → switch stage → execute**
+- **Skills** represent business capabilities / SOPs (Standard Operating Procedures)
+- **Stages** represent workflow phases within a Skill
+- **Tools** are external capabilities exposed at each Stage
 
-That means Claude first sees a skill catalog, then reads the SOP, then explicitly enables a skill, and only then gets access to the smallest tool set needed for the current stage.
+The workflow follows:
+
+**discover → read → enable → progress through stages → execute**
+
+Claude first sees a skill catalog, reads the SOP, enables a skill (entering `initial_stage`), progresses through stages via `change_stage`, and only gets access to the tools needed for the current stage.
+
+**Core governance formula**:
+```
+active_tools = META_TOOLS ∪ (enabled skills with valid grant 的 stage_tools) − blocked_tools
+```
 
 ---
 
@@ -49,14 +60,16 @@ Tool-Gate adds a **governance runtime** between Claude and its tools.
 
 | Feature | What it means | Why it matters |
 |---|---|---|
+| **Stage-first Governance** | Skills define workflow phases (Stages), each with its own tool exposure | Tools follow SOP progression, not exposed all at once |
 | **Progressive Disclosure** | Claude sees a skill catalog first, not the full tool universe | Reduces context bloat and premature tool use |
 | **Explicit Grants** | A skill must be enabled before its tools become available | Keeps permission boundaries clear |
-| **Stage-Based Access** | The same skill can expose different tools in different stages | Supports “understand first, modify later” workflows |
-| **Per-Turn Recompute** | `active_tools` is recomputed on every user turn | Prevents stale state and leaked permissions |
-| **Hard Runtime Guardrails** | `PreToolUse` blocks calls outside the runtime available tool set | Enforces real boundaries, not just hints |
-| **Auditability** | Skill read, enable, revoke, stage changes, and tool calls are logged | Makes decisions explainable and reviewable |
+| **Stage Transition Validation** | `change_stage` enforces `allowed_next_stages` constraints | Prevents invalid workflow state transitions |
+| **Terminal Stage Enforcement** | Stages with `allowed_next_stages: []` block further transitions | Signals workflow completion, prevents backtracking |
+| **Runtime State Separation** | `SessionState` persists, `RuntimeContext` derives `active_tools` each turn | Prevents stale state, expired grants auto-filtered |
+| **Hard Runtime Guardrails** | `PreToolUse` blocks calls outside the runtime `active_tools` set | Enforces real boundaries, not just hints |
+| **Auditability** | Stage transitions, grant lifecycle, tool calls logged with `error_bucket` | Makes decisions explainable and reviewable |
 | **SQLite WAL Persistence** | Hooks and MCP server share state through local SQLite | Reliable local coordination without extra infrastructure |
-| **Plugin-Native Design** | Built around Claude Code plugin conventions | Easy local testing and future distribution |
+| **No-stage Skill Support** | Skills without stages use skill-level `allowed_tools` fallback | Simple skills don't need stage decomposition |
 
 ---
 
@@ -186,14 +199,18 @@ enable_skill("code-edit")
 
 ## Current Status
 
+**Version**: v1.0.0 — Stage-first Skill Governance
+
 | Area | Status |
 |---|---|
-| **Phase 1–3 core chain** | In place |
-| **Phase 4 observability + quality** | In place — 9 audit event types, funnel metrics, 3-bucket miscall classification, optional Langfuse, E2E + boundary suites |
-| **Core path** | `index → policy → grant → rewrite → gate` |
-| **Tests** | 190+ passing, core module coverage ≥ 92% |
-| **Code quality** | `ruff` clean, `mypy --strict` clean on `src/tool_governance/` |
-| **Benchmarks** | Hook p95 < 1 ms, MCP p95 < 1 ms, skill-index cache hit rate 99.5% (see `docs/perf_results.md`) |
+| **Stage-first Governance** | ✅ Complete — Skills as workflows, Stages as phases, Tools follow SOP progression |
+| **Core Governance Chain** | ✅ `Skill → Stage → Grant → RuntimeContext → active_tools → PreToolUse` |
+| **Stage Workflow Metadata** | ✅ `initial_stage`, `allowed_next_stages`, terminal stages, no-stage fallback |
+| **Runtime Enforcement** | ✅ Stage transition validation, terminal stage blocking, expired grant filtering |
+| **Tests** | 290 passing (baseline: 104 at Phase 3 end), core module coverage ≥ 92% |
+| **Code Quality** | `ruff` clean, `mypy --strict` clean on `src/tool_governance/` |
+| **Benchmarks** | Hook p95 < 1 ms, MCP p95 < 1 ms, skill-index cache hit rate 99.5% |
+| **Demo** | [`simulator-demo`](./examples/simulator-demo/) — Canonical Stage-first acceptance with real subprocess boundaries |
 
 ---
 

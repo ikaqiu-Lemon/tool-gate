@@ -1,6 +1,6 @@
 <div align="center">
 
-# Tool-Gate
+# Stagewise-Tool-Gate
 
 **面向 Claude Code 的工具与 Skills 运行时治理插件**
 
@@ -22,7 +22,7 @@
 
 ## 项目概览
 
-Tool-Gate 是一个 **Claude Code 插件形态的运行时治理层**。
+Stagewise-Tool-Gate 是一个 **Claude Code 插件形态的运行时治理层**。
 
 它不是把所有工具一股脑都暴露给 Claude，而是实现了 **Stage-first Skill Governance（阶段优先的技能治理）** 模型：
 
@@ -43,7 +43,7 @@ active_tools = META_TOOLS ∪ (已启用且有效授权的技能的 stage_tools)
 
 ---
 
-## 为什么需要 Tool-Gate？
+## 为什么需要 Stagewise-Tool-Gate？
 
 随着 Claude Code 插件和工具越来越多，模型很容易遇到几个实际问题：
 
@@ -52,7 +52,7 @@ active_tools = META_TOOLS ∪ (已启用且有效授权的技能的 stage_tools)
 - **理解和执行混在一起**：模型还没读懂流程就开始动手
 - **运行时缺少治理**：很难解释某次调用为什么被放行或被拦截
 
-Tool-Gate 的作用，就是在 Claude 和工具之间加上一层**运行时治理层**。
+Stagewise-Tool-Gate 的作用，就是在 Claude 和工具之间加上一层**运行时治理层**。
 
 ---
 
@@ -76,7 +76,7 @@ Tool-Gate 的作用，就是在 Claude 和工具之间加上一层**运行时治
 
 ### 双平面模型
 
-Tool-Gate 把容易混在一起的两件事拆开了：
+Stagewise-Tool-Gate 把容易混在一起的两件事拆开了：
 
 - **知识平面**：Claude 现在能理解什么
 - **执行平面**：Claude 现在能做什么
@@ -157,13 +157,13 @@ pip install -e ".[dev]"
 ### 2）本地加载插件
 
 ```bash
-claude --plugin-dir /path/to/tool-gate
+claude --plugin-dir /path/to/stagewise-tool-gate
 ```
 
 ### 3）校验插件结构
 
 ```bash
-claude plugin validate /path/to/tool-gate
+claude plugin validate /path/to/stagewise-tool-gate
 ```
 
 ### 4）运行测试
@@ -180,7 +180,7 @@ pytest tests/ -v
 Claude 看到技能目录
 → Claude 阅读技能说明
 → Claude 启用技能
-→ Tool-Gate 重算 active_tools
+→ Stagewise-Tool-Gate 重算 active_tools
 → Claude 只使用当前允许的工具
 → grant 过期或被撤销
 ```
@@ -238,18 +238,18 @@ enable_skill("code-edit")
 ## FAQ
 
 ### 它只是一个权限面板或者工具过滤器吗？
-不是。Tool-Gate 是一个**运行时治理层**，不是静态配置页。它管理的是技能发现、显式授权、阶段切换、工具暴露和运行时拦截的完整链路。
+不是。Stagewise-Tool-Gate 是一个**运行时治理层**，不是静态配置页。它管理的是技能发现、显式授权、阶段切换、工具暴露和运行时拦截的完整链路。
 
 ### 为什么要把 `read_skill` 和 `enable_skill` 分开？
 因为“理解能力”和“执行权限”不是一回事。Claude 应该先读 SOP，再获得执行权限。
 
 ### 为什么不直接每轮替换 Claude 能看到的工具列表？
-Claude Code 目前并不适合像某些 Agent 运行时那样，直接做稳定的每轮工具覆盖。Tool-Gate 采用的是更务实的组合：
+Claude Code 目前并不适合像某些 Agent 运行时那样，直接做稳定的每轮工具覆盖。Stagewise-Tool-Gate 采用的是更务实的组合：
 - **UserPromptSubmit** 做软引导
 - **PreToolUse** 做硬拦截
 
 ### 为什么用 SQLite，而不是 Redis 之类？
-因为 Tool-Gate 是本地插件。SQLite WAL 足够让 Hook 进程和 MCP Server 稳定共享状态，而且不需要额外基础设施。
+因为 Stagewise-Tool-Gate 是本地插件。SQLite WAL 足够让 Hook 进程和 MCP Server 稳定共享状态，而且不需要额外基础设施。
 
 ### 支持分阶段编辑吗？
 支持。一个技能可以在不同阶段暴露不同工具，比如 `analysis` 和 `execution`。
@@ -282,7 +282,7 @@ Claude Code 目前并不适合像某些 Agent 运行时那样，直接做稳定�
 pytest tests/ -v
 ruff check .
 mypy src/tool_governance/
-claude plugin validate /path/to/tool-gate
+claude plugin validate /path/to/stagewise-tool-gate
 ```
 
 ---
@@ -457,7 +457,7 @@ blocked_tools: []
 ### 项目结构
 
 ```text
-tool-governance-plugin/
+stagewise-tool-gate/
 ├── .claude-plugin/
 │   └── plugin.json              # 插件清单
 ├── skills/

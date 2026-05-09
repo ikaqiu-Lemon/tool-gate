@@ -1,4 +1,4 @@
-# Tool-Gate Project Inventory Report v1.0.1
+# Stagewise-Stagewise-Tool-Gate Project Inventory Report v1.0.1
 
 **Generated**: 2026-05-06  
 **Purpose**: Accurate pre-cleanup inventory for v1.0.0 Stage-first Skill Governance release  
@@ -26,7 +26,7 @@
 This inventory is based on the following real command outputs executed on 2026-05-06:
 
 ```bash
-pwd                                    # /home/zh/tool-gate
+pwd                                    # /home/zh/stagewise-tool-gate
 git status --short                     # Show working tree status
 git diff --cached --name-status        # Show staged changes (empty)
 git ls-files --deleted                 # Show deleted tracked files (11 files)
@@ -107,7 +107,7 @@ D  examples/simulator-demo/STAGE_D_COMPLETE.md
 Based on real `find` command outputs:
 
 ```
-tool-gate/
+stagewise-tool-gate/
 ├── .claude/                          # Claude Code IDE integration
 │   ├── commands/opsx/                # OpenSpec commands
 │   └── skills/                       # 15 skill definitions

@@ -1,13 +1,13 @@
-# Tool-Gate Documentation
+# Stagewise-Tool-Gate Documentation
 
-This directory contains documentation for the tool-gate project.
+This directory contains documentation for the stagewise-tool-gate project.
 
 ## Available Documents
 
 ### [session_logging_prompt.md](./session_logging_prompt.md)
-**Session Logging Implementation Guide for Tool-Gate**
+**Session Logging Implementation Guide for Stagewise-Tool-Gate**
 
-A comprehensive prompt tailored specifically for the tool-gate project that guides the implementation of structured session logging and audit trail generation.
+A comprehensive prompt tailored specifically for the stagewise-tool-gate project that guides the implementation of structured session logging and audit trail generation.
 
 **Key Features**:
 - Designed for the tool-governance middleware architecture (not a standalone agent)

@@ -1,6 +1,6 @@
 """mock_shell_stdio — 混杂变量工具(confounder)for example 02 (doc-edit-staged).
 
-**混杂变量工具**。此 MCP server 仅为制造真实工具混杂环境以验证 tool-gate 的拦截能力。
+**混杂变量工具**。此 MCP server 仅为制造真实工具混杂环境以验证 stagewise-tool-gate 的拦截能力。
 它**不代表**本项目支持任意 shell 执行,也不是任何主业务能力。
 
 在样例 02 中,run_command 被列入 config/demo_policy.yaml 的全局 blocked_tools;

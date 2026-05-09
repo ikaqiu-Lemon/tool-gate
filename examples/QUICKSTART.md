@@ -1,6 +1,6 @@
-# Tool-Gate 演示样例 · 新手快速上手(QUICKSTART)
+# Stagewise-Tool-Gate 演示样例 · 新手快速上手(QUICKSTART)
 
-> 面向**从没用过 Claude Code CLI / MCP / 本项目**的读者。读完这一篇 + 任一 workspace 的 README,可在**不挂 API key、不联网**的前提下跑通一次完整的 tool-gate 演示。
+> 面向**从没用过 Claude Code CLI / MCP / 本项目**的读者。读完这一篇 + 任一 workspace 的 README,可在**不挂 API key、不联网**的前提下跑通一次完整的 stagewise-tool-gate 演示。
 
 ---
 
@@ -74,7 +74,7 @@
 
 ```bash
 # 绝对路径样板 —— 无论你当前 shell 在哪个目录都能跑
-cd /home/<you>/path/to/tool-gate   # 替换成仓库实际路径
+cd /home/<you>/path/to/stagewise-tool-gate   # 替换成仓库实际路径
 pip install -e ".[dev]"
 
 # 安装完自检(两条都应有输出)
@@ -89,7 +89,7 @@ which tg-mcp
 仓库根有 `pyproject.toml`,examples 下每个 workspace 目录**没有**。如果你在 workspace 目录执行 `pip install -e ".[dev]"`,会看到这条错误:
 
 ```
-ERROR: file:///home/<you>/tool-gate/examples/01-knowledge-link
+ERROR: file:///home/<you>/stagewise-tool-gate/examples/01-knowledge-link
        does not appear to be a Python project:
        neither 'setup.py' nor 'pyproject.toml' found.
 ```
@@ -109,7 +109,7 @@ ERROR: file:///home/<you>/tool-gate/examples/01-knowledge-link
 **示例 1 · SessionStart**
 
 ```bash
-cd /home/<you>/tool-gate/examples/01-knowledge-link   # 替换路径
+cd /home/<you>/stagewise-tool-gate/examples/01-knowledge-link   # 替换路径
 export GOVERNANCE_DATA_DIR="$PWD/.demo-data"
 export GOVERNANCE_SKILLS_DIR="$PWD/skills"
 export GOVERNANCE_CONFIG_DIR="$PWD/config"
@@ -127,7 +127,7 @@ echo '{"event":"SessionStart","session_id":"qs-demo","cwd":"'"$PWD"'"}' | tg-hoo
 
 **示例 2 · PreToolUse 被拦(授权前必攔)**
 
-> 💡 **Deny 是预期行为**:在未调 `enable_skill` 启用特定技能前,tool-gate 严格遵循"默认拒绝"原则。本路径演示即便你此时还没有用过 Claude 模型一次,非法工具调用也会被真实拦截。
+> 💡 **Deny 是预期行为**:在未调 `enable_skill` 启用特定技能前,stagewise-tool-gate 严格遵循"默认拒绝"原则。本路径演示即便你此时还没有用过 Claude 模型一次,非法工具调用也会被真实拦截。
 
 ```bash
 echo '{"event":"PreToolUse","session_id":"qs-demo","tool_name":"yuque_search","tool_input":{}}' | tg-hook
@@ -139,7 +139,7 @@ echo '{"event":"PreToolUse","session_id":"qs-demo","tool_name":"yuque_search","t
 {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Tool 'yuque_search' is not in active_tools. ...","additionalContext":"To use this tool, first discover available skills with list_skills, then read_skill to understand the workflow, then enable_skill to authorize."}}
 ```
 
-看到 `permissionDecision: "deny"` 即代表 tool-gate 的拦截链路已跑通。如果要看到 `allow`,需要走方式 A 完成真实交互。
+看到 `permissionDecision: "deny"` 即代表 stagewise-tool-gate 的拦截链路已跑通。如果要看到 `allow`,需要走方式 A 完成真实交互。
 
 > ⚠️ **诚实划界**:`tg-hook` 子进程 replay 产出 **stdout 决策**,但**不会把事件写入** `governance.db` 的审计表(schema 初始化由 `tg-mcp` / Claude CLI harness 驱动,不在 hook 重放路径内)。要看到完整审计链,走方式 A(§3.2)。§4 verify 的 SQL 在只跑方式 B 的环境下会看到空表或仅文件存在,这是预期。
 >
@@ -150,7 +150,7 @@ echo '{"event":"PreToolUse","session_id":"qs-demo","tool_name":"yuque_search","t
 如果你装了 [Claude Code CLI](https://docs.anthropic.com/claude/docs/claude-code) **且**已配置 Anthropic API key:
 
 ```bash
-cd /home/<you>/tool-gate/examples/01-knowledge-link
+cd /home/<you>/stagewise-tool-gate/examples/01-knowledge-link
 export GOVERNANCE_DATA_DIR="$PWD/.demo-data"
 export GOVERNANCE_SKILLS_DIR="$PWD/skills"
 export GOVERNANCE_CONFIG_DIR="$PWD/config"
@@ -182,7 +182,7 @@ sqlite3 "$GOVERNANCE_DATA_DIR/governance.db" \
 两次连续演示之间,`governance.db` 会残留上一次状态,导致第二次的 verify 与期望行对不上。**清理只需一条命令**,精确作用在**当前 workspace 的** `.demo-data/`:
 
 ```bash
-cd /home/<you>/tool-gate/examples/0X-*/   # 具体 workspace
+cd /home/<you>/stagewise-tool-gate/examples/0X-*/   # 具体 workspace
 rm -rf ./.demo-data
 ```
 
@@ -204,7 +204,7 @@ rm -rf ./.demo-data
 | T-8 | 01 附录 `refresh_skills` 插曲后,`list_skills` 仍看不到新技能 | `skills_incoming/` 只是文档约定,必须**手动** `cp -r skills_incoming/yuque-comment-sync skills/`,再调 `refresh_skills()` | `ls examples/01-*/skills/` 是否含 `yuque-comment-sync` | 拷贝目录 → 再调 `refresh_skills`;两步顺序不能反 |
 | T-9 | `tg-hook` 对合法事件返回 `{}` 而非 `permissionDecision` | 用了 `hook_event_name` 而不是 `event`。`tg-hook` 源码明确读 `"event"`;Claude Code harness 默认 envelope 是 `"hook_event_name"`,子进程 replay 需要**重命名字段** | 复制 §3.1 示例 1 的命令,把 JSON 中的 `"event"` 改回 `"hook_event_name"` 再重放 —— 应看到 `{}` | 把 JSON 键改回 `"event": "SessionStart"` 等 |
 
-> ⚠️ **对根 `examples/README.md §5.1` 的警示**: 该节给出的子进程 replay 示例使用了 `hook_event_name` 字段名，**未经实测**（该节也自述"Phase B 会追加实测 stdout 段"未兑现）。其 stdout 形状承诺不应作为 tool-gate 可观察 deny/allow 的基线。以本 QUICKSTART §3.1 实测形状为准。*(历史遗留问题，不影响当前使用)*
+> ⚠️ **对根 `examples/README.md §5.1` 的警示**: 该节给出的子进程 replay 示例使用了 `hook_event_name` 字段名，**未经实测**（该节也自述"Phase B 会追加实测 stdout 段"未兑现）。其 stdout 形状承诺不应作为 stagewise-tool-gate 可观察 deny/allow 的基线。以本 QUICKSTART §3.1 实测形状为准。*(历史遗留问题，不影响当前使用)*
 
 ---
 

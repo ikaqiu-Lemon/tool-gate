@@ -1,6 +1,6 @@
 <div align="center">
 
-# Tool-Gate
+# Stagewise-Tool-Gate
 
 **Runtime governance for Claude Code tools and Skills**
 
@@ -22,9 +22,9 @@ Control what Claude can see, enable, and use — with **progressive disclosure**
 
 ## Overview
 
-Tool-Gate is a **Claude Code plugin** that adds a governance runtime between Claude and the tools it can call.
+Stagewise-Tool-Gate is a **Claude Code plugin** that adds a governance runtime between Claude and the tools it can call.
 
-Instead of exposing every tool all the time, Tool-Gate implements **Stage-first Skill Governance** — a model where:
+Instead of exposing every tool all the time, Stagewise-Tool-Gate implements **Stage-first Skill Governance** — a model where:
 
 - **Skills** represent business capabilities / SOPs (Standard Operating Procedures)
 - **Stages** represent workflow phases within a Skill
@@ -43,7 +43,7 @@ active_tools = META_TOOLS ∪ (enabled skills with valid grant 的 stage_tools) 
 
 ---
 
-## Why Tool-Gate?
+## Why Stagewise-Tool-Gate?
 
 As the Claude Code plugin ecosystem grows, the model may face:
 
@@ -52,7 +52,7 @@ As the Claude Code plugin ecosystem grows, the model may face:
 - **Mixed-up knowledge and execution** → the model can try to act before it fully understands the workflow
 - **Weak runtime control** → hard to explain why a tool call was allowed or denied
 
-Tool-Gate adds a **governance runtime** between Claude and its tools.
+Stagewise-Tool-Gate adds a **governance runtime** between Claude and its tools.
 
 ---
 
@@ -77,7 +77,7 @@ Tool-Gate adds a **governance runtime** between Claude and its tools.
 
 ### Dual-plane model
 
-Tool-Gate separates two things that are often mixed together:
+Stagewise-Tool-Gate separates two things that are often mixed together:
 
 - **Knowledge plane** — what Claude is allowed to understand
 - **Execution plane** — what Claude is allowed to do right now
@@ -158,13 +158,13 @@ pip install -e ".[dev]"
 ### 2) Load the plugin locally
 
 ```bash
-claude --plugin-dir /path/to/tool-gate
+claude --plugin-dir /path/to/stagewise-tool-gate
 ```
 
 ### 3) Validate the plugin
 
 ```bash
-claude plugin validate /path/to/tool-gate
+claude plugin validate /path/to/stagewise-tool-gate
 ```
 
 ### 4) Run tests
@@ -181,7 +181,7 @@ pytest tests/ -v
 Claude sees skill catalog
 → Claude reads a skill SOP
 → Claude enables the skill
-→ Tool-Gate recomputes active_tools
+→ Stagewise-Tool-Gate recomputes active_tools
 → Claude uses only the allowed tools
 → grant expires or is revoked
 ```
@@ -244,21 +244,21 @@ enable_skill("code-edit")
 ## FAQ
 
 ### Is this just a permission panel or a tool filter?
-No. Tool-Gate is a **runtime governance layer**, not a static settings page. It controls discovery, enablement, stage transitions, tool visibility, and runtime interception.
+No. Stagewise-Tool-Gate is a **runtime governance layer**, not a static settings page. It controls discovery, enablement, stage transitions, tool visibility, and runtime interception.
 
 ### Why separate `read_skill` and `enable_skill`?
 Because understanding and execution are different. Claude should first read the SOP and only then gain access to tools.
 
 ### Why not dynamically replace Claude’s tool list directly?
-Claude Code does not reliably support direct per-turn tool override in the same way some agent runtimes do. Tool-Gate uses a practical combination of **soft guidance** (`UserPromptSubmit`) and **hard interception** (`PreToolUse`).
+Claude Code does not reliably support direct per-turn tool override in the same way some agent runtimes do. Stagewise-Tool-Gate uses a practical combination of **soft guidance** (`UserPromptSubmit`) and **hard interception** (`PreToolUse`).
 
 ### Why use SQLite instead of Redis or another service?
-Tool-Gate runs as a local plugin. SQLite WAL is enough to keep hook processes and the MCP server consistent without adding external infrastructure.
+Stagewise-Tool-Gate runs as a local plugin. SQLite WAL is enough to keep hook processes and the MCP server consistent without adding external infrastructure.
 
 ### Does it support staged editing workflows?
 Yes. A skill can expose different allowed tools in different stages, such as `analysis` and `execution`.
 
-### Is Tool-Gate finished?
+### Is Stagewise-Tool-Gate finished?
 Not fully. Phase 1–3 core governance is in place. The next step is hardening, observability, and Phase 4 polish.
 
 ---
@@ -286,7 +286,7 @@ Before opening a PR, please run:
 pytest tests/ -v
 ruff check .
 mypy src/tool_governance/
-claude plugin validate /path/to/tool-gate
+claude plugin validate /path/to/stagewise-tool-gate
 ```
 
 ---

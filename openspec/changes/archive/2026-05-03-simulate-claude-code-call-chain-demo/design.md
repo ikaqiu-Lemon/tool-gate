@@ -2,7 +2,7 @@
 
 ### Background
 
-The tool-gate project has three complete example workspaces (01-knowledge-link, 02-doc-edit-staged, 03-lifecycle-and-risk) that demonstrate governance capabilities through end-to-end demos. These examples show *what* the governance system does, but they don't explicitly demonstrate *how* the subprocess isolation and protocol boundaries work.
+The stagewise-tool-gate project has three complete example workspaces (01-knowledge-link, 02-doc-edit-staged, 03-lifecycle-and-risk) that demonstrate governance capabilities through end-to-end demos. These examples show *what* the governance system does, but they don't explicitly demonstrate *how* the subprocess isolation and protocol boundaries work.
 
 The governance chain involves multiple process boundaries:
 - **Agent**: Simulates Claude's decision-making (which skill to enable, which tool to call)

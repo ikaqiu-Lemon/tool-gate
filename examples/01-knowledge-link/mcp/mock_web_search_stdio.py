@@ -1,6 +1,6 @@
 """mock_web_search_stdio — confounder MCP for example 01 (knowledge-link).
 
-**混杂变量工具**。仅为制造真实工具混杂环境以验证 tool-gate 的拦截能力。
+**混杂变量工具**。仅为制造真实工具混杂环境以验证 stagewise-tool-gate 的拦截能力。
 此 MCP server **不代表**本项目支持 Web 搜索业务,也不是任何主业务能力。
 
 在样例 01 中,rag_paper_search 不在 yuque-knowledge-link 技能的 allowed_tools 里;

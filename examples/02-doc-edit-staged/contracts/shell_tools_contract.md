@@ -2,7 +2,7 @@
 
 > ⚠️ **关于 `mock_shell_stdio.py` 的角色**
 >
-> 此 MCP server 是**混杂变量工具**,仅为制造真实工具混杂环境以验证 tool-gate 的拦截能力。它**不代表**本项目支持任意 shell 执行,也不是任何主业务能力。
+> 此 MCP server 是**混杂变量工具**,仅为制造真实工具混杂环境以验证 stagewise-tool-gate 的拦截能力。它**不代表**本项目支持任意 shell 执行,也不是任何主业务能力。
 >
 > 在本样例中,`run_command` 被列入 `config/demo_policy.yaml` 的全局 `blocked_tools`,因此无论哪个技能在任何阶段尝试调用,`PreToolUse` 都会返回 `deny reason=blocked`。该工具仅用于验证**全局红线**路径,不进入任何技能的 `allowed_tools`。
 

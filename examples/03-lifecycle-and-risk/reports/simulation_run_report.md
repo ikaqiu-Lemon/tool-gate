@@ -9,7 +9,7 @@
 
 ## 执行摘要 (Executive Summary)
 
-本次模拟成功演示了 tool-gate 在会话生命周期管理和风险升级场景下的治理能力。模拟运行时长 3.03 秒，生成了完整的审计日志和指标数据。
+本次模拟成功演示了 stagewise-tool-gate 在会话生命周期管理和风险升级场景下的治理能力。模拟运行时长 3.03 秒，生成了完整的审计日志和指标数据。
 
 ### 关键成果
 - ✅ **会话生命周期管理**: 成功演示权限检查、技能重新启用流程
@@ -25,7 +25,7 @@
 ### 1.1 基础信息
 | 项目 | 值 |
 |------|-----|
-| 工作目录 | `/home/zh/tool-gate/examples/03-lifecycle-and-risk` |
+| 工作目录 | `/home/zh/stagewise-tool-gate/examples/03-lifecycle-and-risk` |
 | 数据目录 | `.demo-data` |
 | 技能目录 | `skills/` (3 个技能) |
 | 配置目录 | `config/` |

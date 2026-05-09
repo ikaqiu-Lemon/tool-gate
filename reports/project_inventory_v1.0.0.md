@@ -1,4 +1,4 @@
-# Tool-Gate Project Inventory Report (v1.0.0)
+# Stagewise-Stagewise-Tool-Gate Project Inventory Report (v1.0.0)
 
 **Generated**: 2026-05-06  
 **Purpose**: Pre-cleanup inventory for v1.0.0 Stage-first Skill Governance release  
@@ -21,7 +21,7 @@ This inventory categorizes all project files to support informed cleanup decisio
 
 ## Category 1: Core Runtime (KEEP)
 
-**Purpose**: Production code for Tool-Gate governance system
+**Purpose**: Production code for Stagewise-Stagewise-Tool-Gate governance system
 
 ### Source Code
 ```
@@ -177,7 +177,7 @@ examples/03-lifecycle-and-risk/
 **Status**: ✅ Keep all  
 **Rationale**: 
 - IDE-specific skill definitions
-- Enable Tool-Gate integration with Claude Code, Cursor, etc.
+- Enable Stagewise-Stagewise-Tool-Gate integration with Claude Code, Cursor, etc.
 - Small footprint (~50 files, <1MB total)
 
 ---
@@ -300,7 +300,7 @@ reports/
 
 **Core Project** (~40MB):
 ```
-tool-gate/
+stagewise-tool-gate/
 ├── src/                    # 23 modules
 ├── tests/                  # 29 test modules
 ├── docs/                   # 4 guides + architecture/

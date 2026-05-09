@@ -5,7 +5,7 @@
 - **开始时间**: 2026-04-30T13:28:27.666470+00:00
 - **结束时间**: 2026-04-30T13:28:32.198153+00:00
 - **总耗时**: 4.53 秒
-- **工作目录**: /home/zh/tool-gate/examples/01-knowledge-link
+- **工作目录**: /home/zh/stagewise-tool-gate/examples/01-knowledge-link
 
 ## 2. 用户请求
 ```

@@ -8,7 +8,7 @@
 > 如需了解当前 Stage-first Skill governance 流程，请从 [`examples/simulator-demo`](../simulator-demo/) 开始。
 > 不建议新用户使用本样例学习 Stage-first governance。
 
-> 本样例展示 tool-gate 的**基础主流程**:一个新会话中,Claude 如何被引导从"看到技能目录 → 阅读 SOP → 启用技能 → 使用工具"一步步走过来;在这条链路上,**混杂工具会被真实拦住**。
+> 本样例展示 stagewise-tool-gate 的**基础主流程**:一个新会话中,Claude 如何被引导从"看到技能目录 → 阅读 SOP → 启用技能 → 使用工具"一步步走过来;在这条链路上,**混杂工具会被真实拦住**。
 
 > ⚠️ **Preflight**:本 workspace **不负责**项目安装。先读 [`../QUICKSTART.md`](../QUICKSTART.md)(§1 概念 + wiring / §2 零知识安装 / §7 preflight 自检),按 §2 在**仓库根**完成一次性安装之后再回来跑本样例。workspace 目录仅负责 demo run。
 
@@ -187,8 +187,8 @@ examples/01-knowledge-link/
 **业务背景**:用户是一名知识工程师,正在维护团队内部的 RAG 知识库。工作台里装了**多种搜索源**(语雀、RAG 论文搜索、内部 wiki),今天想让 Claude 做一次"最近写的 RAG 笔记的知识关联",**期望只用语雀读操作完成,不要触发其他搜索工具,也不要改文档**。
 
 **展示目标**:
-1. 证明 tool-gate 在**低风险只读技能**上做到"默认可启用、无需人工确认"
-2. 证明即使用户的提示里有"顺便查下 RAG 论文"/"顺手把标题改一下"之类越界诱导,tool-gate 依然只会放行**当前技能声明过的工具**
+1. 证明 stagewise-tool-gate 在**低风险只读技能**上做到"默认可启用、无需人工确认"
+2. 证明即使用户的提示里有"顺便查下 RAG 论文"/"顺手把标题改一下"之类越界诱导,stagewise-tool-gate 依然只会放行**当前技能声明过的工具**
 3. 证明**新技能的动态可发现性**(`refresh_skills` 插曲)
 
 ---
@@ -306,7 +306,7 @@ sqlite3 .demo-data/governance.db "SELECT * FROM audit_log ORDER BY created_at;"
 
 ## 6. Session Logging 实现
 
-本样例实现了完整的会话日志记录，符合 `tool-gate/docs/session_logging_prompt.md` 规范。
+本样例实现了完整的会话日志记录，符合 `stagewise-tool-gate/docs/session_logging_prompt.md` 规范。
 
 ### 日志文件
 

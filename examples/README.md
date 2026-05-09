@@ -1,4 +1,4 @@
-# Tool-Gate 交付演示样例
+# Stagewise-Tool-Gate 交付演示样例
 
 本示例使用 Yuque 风格的 mock 工具仅作为稳定、可控的演示载体;项目本身并不绑定 Yuque 领域。
 
@@ -37,7 +37,7 @@
 | [`02-doc-edit-staged/`](./02-doc-edit-staged/) | 受控编辑与分阶段 | `require_reason` + 两阶段 `change_stage` + `blocked_tools` 全局红线 |
 | [`03-lifecycle-and-risk/`](./03-lifecycle-and-risk/) | 会话生命周期与风险升级 | TTL 过期回收 / 主动 `disable` / 高风险 `approval_required` / 审计顺序闭环 |
 
-前三个样例围绕同一个虚构业务故事展开:**知识工程师 Alice 用 Claude Code 维护她的内部知识库**。Alice 的工作台刻意混装了若干 MCP:除语雀风格 MCP 外,还安装了通用 Web 搜索、内部 wiki 搜索、以及一个能跑 shell 的第三方 MCP。tool-gate 的职责是**只让当前启用技能真正需要的工具进到 `active_tools`**,其它一律被 `PreToolUse` 拦下。
+前三个样例围绕同一个虚构业务故事展开:**知识工程师 Alice 用 Claude Code 维护她的内部知识库**。Alice 的工作台刻意混装了若干 MCP:除语雀风格 MCP 外,还安装了通用 Web 搜索、内部 wiki 搜索、以及一个能跑 shell 的第三方 MCP。stagewise-tool-gate 的职责是**只让当前启用技能真正需要的工具进到 `active_tools`**,其它一律被 `PreToolUse` 拦下。
 
 这些 legacy examples 保留用于参考早期治理模式,但**不演示 Stage-first governance**。
 
@@ -142,7 +142,7 @@ echo '{"hook_event_name":"PreToolUse","session_id":"demo","tool_name":"search_we
 
 ### 5.3 `mcp/mock_shell_stdio.py` 是用来做什么的?
 
-它是**混杂变量工具**,仅为制造真实工具混杂环境以验证 tool-gate 的拦截能力。它**不代表**本项目支持任意 shell 执行,也不是任何主业务能力。仅样例 02 使用,用于演示 `blocked_tools: [run_command]` 的全局红线。
+它是**混杂变量工具**,仅为制造真实工具混杂环境以验证 stagewise-tool-gate 的拦截能力。它**不代表**本项目支持任意 shell 执行,也不是任何主业务能力。仅样例 02 使用,用于演示 `blocked_tools: [run_command]` 的全局红线。
 
 ### 5.4 Phase A 产物能通过哪些自检?
 

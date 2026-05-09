@@ -107,7 +107,7 @@ This bug fix is documented in `BUG_FIX_INDEXER_INITIALIZATION.md` and covered by
 
 ### Problem Statement
 
-The current examples (01, 02, 03) demonstrate tool-gate's governance capabilities through **end-to-end workspace demos**, but they lack a **unified simulator** that explicitly shows the **subprocess isolation and protocol boundaries** that make the governance chain work.
+The current examples (01, 02, 03) demonstrate stagewise-tool-gate's governance capabilities through **end-to-end workspace demos**, but they lack a **unified simulator** that explicitly shows the **subprocess isolation and protocol boundaries** that make the governance chain work.
 
 Reviewers and developers need to see:
 1. How hook subprocesses communicate via stdin/stdout JSON

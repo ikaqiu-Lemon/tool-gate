@@ -49,7 +49,7 @@
 
 ### 3. Session Logging ✅
 
-完全符合 `tool-gate/docs/session_logging_prompt.md` 规范：
+完全符合 `stagewise-tool-gate/docs/session_logging_prompt.md` 规范：
 - ✅ events.jsonl - JSONL 格式事件流
 - ✅ audit_summary.md - Markdown 审计报告
 - ✅ metrics.json - 结构化指标

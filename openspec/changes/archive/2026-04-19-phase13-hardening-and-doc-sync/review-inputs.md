@@ -7,7 +7,7 @@
 
 - **Change name**: `phase13-hardening-and-doc-sync`
 - **Branch**: `fix/phase13-hardening`
-- **Base commit (merge-base with `main`)**: `3cdc5e6` — `feat: bootstrap Tool-Gate Claude Code plugin with runtime governance core`
+- **Base commit (merge-base with `main`)**: `3cdc5e6` — `feat: bootstrap Stagewise-Tool-Gate Claude Code plugin with runtime governance core`
 - **Working tree at closeout**: all Stage A–D edits are **uncommitted** on the
   branch (see "Files touched" below). The reviewer should commit / squash
   according to the project's own policy before re-running the review.

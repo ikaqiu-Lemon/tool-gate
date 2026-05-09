@@ -16,7 +16,7 @@ The delivery demo harness SHALL organize showcase artifacts as **independent dem
 #### Scenario: Workspace self-contained startup
 
 - **WHEN** a reviewer runs `cd examples/01-knowledge-link/ && claude --plugin-dir ../../ --mcp-config ./.mcp.json`
-- **THEN** the Claude Code session starts with tool-gate loaded and the workspace's own mock MCP servers registered
+- **THEN** the Claude Code session starts with stagewise-stagewise-tool-gate loaded and the workspace's own mock MCP servers registered
 - **AND** no additional environment variable beyond the plugin's own (`CLAUDE_PLUGIN_ROOT`, `CLAUDE_PLUGIN_DATA`) is required
 
 ### Requirement: Minimum Asset Set Per Workspace
@@ -126,7 +126,7 @@ For every mock MCP tool with a contract entry, the workspace SHALL contain a `sc
 
 ### Requirement: `mock_shell_stdio.py` Role Disclaimer
 
-Wherever `mock_shell_stdio.py` appears — inside `contracts/shell_tools_contract.md`, inside the Python file's module docstring, and inside the workspace `README.md`'s "Mock 工具契约速览" section — a disclaimer MUST state verbatim that it is a **混杂变量工具**, used only to create a realistic mixed-tool environment for demonstrating tool-gate's interception capability, and does NOT indicate that this project supports arbitrary shell execution.
+Wherever `mock_shell_stdio.py` appears — inside `contracts/shell_tools_contract.md`, inside the Python file's module docstring, and inside the workspace `README.md`'s "Mock 工具契约速览" section — a disclaimer MUST state verbatim that it is a **混杂变量工具**, used only to create a realistic mixed-tool environment for demonstrating stagewise-stagewise-tool-gate's interception capability, and does NOT indicate that this project supports arbitrary shell execution.
 
 #### Scenario: Contract disclaimer present
 
@@ -200,7 +200,7 @@ This change SHALL NOT modify files under `src/tool_governance/`, `tests/function
 
 ### Requirement: Mixed-Tool Interception Demonstrated In Every Workspace
 
-Each workspace MUST demonstrate tool-gate's hard-interception behavior by including at least one intentional "confounder" tool call attempt whose `系统侧事件` column records either a `PreToolUse` deny with `tool_not_available` or a `blocked_tools` denial. The confounder tool MUST be a real MCP tool registered via the workspace's `.mcp.json`, not a fictional name.
+Each workspace MUST demonstrate stagewise-stagewise-tool-gate's hard-interception behavior by including at least one intentional "confounder" tool call attempt whose `系统侧事件` column records either a `PreToolUse` deny with `tool_not_available` or a `blocked_tools` denial. The confounder tool MUST be a real MCP tool registered via the workspace's `.mcp.json`, not a fictional name.
 
 #### Scenario: Workspace 01 confounder
 

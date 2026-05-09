@@ -4,7 +4,7 @@
 yuque_get_doc / yuque_update_doc / yuque_delete_doc 五个工具。
 
 yuque_delete_doc 是**高风险工具**,在 demo_policy.yaml 的 blocked_tools 中;
-任何调用都会被 tool-gate 在 PreToolUse 阶段 deny,此 handler 的返回值实际永远不会传给模型。
+任何调用都会被 stagewise-tool-gate 在 PreToolUse 阶段 deny,此 handler 的返回值实际永远不会传给模型。
 保留它只是为了让 list_tools 目录里真的包含这个工具,使两层防线(approval_required +
 blocked_tools)都能被真实触发。
 """

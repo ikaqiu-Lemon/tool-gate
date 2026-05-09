@@ -1,6 +1,6 @@
-# Session Logging Prompt for Tool-Gate Project
+# Session Logging Prompt for Stagewise-Tool-Gate Project
 
-**日志保存路径**: `/home/zh/tool-gate/examples/01-knowledge-link/logs`
+**日志保存路径**: `/home/zh/stagewise-tool-gate/examples/01-knowledge-link/logs`
 
 **目标**: 在 tool-governance 中间件的会话生命周期内，自动记录治理事件，并在会话结束后生成结构化日志文件，便于复盘、评测、审计和项目展示。
 
@@ -72,7 +72,7 @@
 
 ### 2. 日志保存路径
 
-**环境变量**: `GOVERNANCE_LOG_DIR=/home/zh/tool-gate/examples/01-knowledge-link/logs`
+**环境变量**: `GOVERNANCE_LOG_DIR=/home/zh/stagewise-tool-gate/examples/01-knowledge-link/logs`
 
 **目录结构**:
 ```
@@ -508,7 +508,7 @@ export LANGFUSE_HOST=https://cloud.langfuse.com
 - 开始时间: 2026-04-29T07:36:00+08:00
 - 结束时间: 2026-04-29T07:40:00+08:00
 - 总耗时: 240 秒
-- 工作目录: /home/zh/tool-gate/examples/01-knowledge-link
+- 工作目录: /home/zh/stagewise-tool-gate/examples/01-knowledge-link
 - Policy 版本: default_policy.yaml
 
 ## 2. 任务特征推断
@@ -713,7 +713,7 @@ export LANGFUSE_HOST=https://cloud.langfuse.com
 **验证命令示例**:
 ```bash
 # 1. 运行 demo
-cd /home/zh/tool-gate/examples/01-knowledge-link
+cd /home/zh/stagewise-tool-gate/examples/01-knowledge-link
 export GOVERNANCE_DATA_DIR="$PWD/.demo-data"
 export GOVERNANCE_SKILLS_DIR="$PWD/skills"
 export GOVERNANCE_CONFIG_DIR="$PWD/config"
@@ -752,7 +752,7 @@ cat logs/session_demo-01/audit_summary.md
    - `logs/session_{session_id}/state_after.json`
 
 3. **日志保存路径**:
-   - `/home/zh/tool-gate/examples/01-knowledge-link/logs`
+   - `/home/zh/stagewise-tool-gate/examples/01-knowledge-link/logs`
 
 4. **如何运行一次 demo 生成日志**:
    - 提供完整的命令行步骤
@@ -772,7 +772,7 @@ cat logs/session_demo-01/audit_summary.md
 
 ## 附录：与原始 Prompt 的差异
 
-本 Prompt 针对 tool-gate 项目的实际架构进行了以下调整：
+本 Prompt 针对 stagewise-tool-gate 项目的实际架构进行了以下调整：
 
 ### 主要差异
 

@@ -1,4 +1,4 @@
-# Tool-Gate 当前能力治理模型说明
+# Stagewise-Tool-Gate 当前能力治理模型说明
 
 **生成时间**: 2026-05-05  
 **Git Commit**: 927a276eee303833c05d312bc7d9ce25d0109ef8  
@@ -8,7 +8,7 @@
 
 ## 1. 当前模型一句话概括
 
-Tool-Gate 实现了一个基于 Skill、Stage、Grant 的渐进式工具授权模型。
+Stagewise-Tool-Gate 实现了一个基于 Skill、Stage、Grant 的渐进式工具授权模型。
 
 **核心机制**：Skill 定义工具集合和操作边界，Stage 控制 Skill 内部的工具可见性演进，Grant 记录授权凭证。RuntimeContext 在每个回合从持久化的 SessionState 派生出当前可用工具集 active_tools，PreToolUse hook 在工具调用前检查工具名是否在 active_tools 中，从而实现细粒度的工具准入控制。
 
@@ -1250,7 +1250,7 @@ verify_stage_first.py
 
 ### 11.1 当前能力治理模型的核心闭环
 
-Tool-Gate 实现了一个 **Skill → Stage → Grant → RuntimeContext → active_tools → PreToolUse** 的完整闭环：
+Stagewise-Tool-Gate 实现了一个 **Skill → Stage → Grant → RuntimeContext → active_tools → PreToolUse** 的完整闭环：
 
 1. **Skill 定义能力边界**：通过 SKILL.md 声明 allowed_tools 或 stages
 2. **Stage 控制渐进演进**：通过 allowed_next_stages 强制状态机转移

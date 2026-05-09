@@ -5,7 +5,7 @@
 - **开始时间**: 2026-04-30T14:32:28.624112+00:00
 - **结束时间**: 2026-04-30T14:32:33.174763+00:00
 - **总耗时**: 4.55 秒
-- **工作目录**: /home/zh/tool-gate/examples/02-doc-edit-staged
+- **工作目录**: /home/zh/stagewise-tool-gate/examples/02-doc-edit-staged
 
 ## 2. 用户请求
 ```

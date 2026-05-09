@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-本场景验证 Tool-Gate 的 **Stage-first Skill Governance** 生命周期能力，覆盖：
+本场景验证 Stagewise-Tool-Gate 的 **Stage-first Skill Governance** 生命周期能力，覆盖：
 
 - ✅ **Terminal Stage Enforcement** — `allowed_next_stages: []` 阻止非法状态转移
 - ✅ **Stage State Persistence** — `current_stage`, `stage_history`, `exited_stages` 持久化到 SQLite
@@ -18,13 +18,13 @@
 - ✅ **Full Audit Trail** — 所有治理决策可追溯（`stage.transition.allow/deny`, `grant.expire`, `skill.disable`）
 - ✅ **Real Subprocess Boundary** — 真实 `tg-hook` / `tg-mcp` 子进程，通过 SQLite 共享状态
 
-**关键成果**: 本场景通过真实子进程边界验证了 Tool-Gate 的可控、可审计、可恢复的 Agent 工具治理能力。
+**关键成果**: 本场景通过真实子进程边界验证了 Stagewise-Tool-Gate 的可控、可审计、可恢复的 Agent 工具治理能力。
 
 ---
 
-## 1. Tool-Gate 治理模型概览
+## 1. Stagewise-Tool-Gate 治理模型概览
 
-Tool-Gate 通过 **Skill → Stage → Grant → RuntimeContext → active_tools → PreToolUse** 构成渐进式工具治理闭环。
+Stagewise-Tool-Gate 通过 **Skill → Stage → Grant → RuntimeContext → active_tools → PreToolUse** 构成渐进式工具治理闭环。
 
 | 概念 | 含义 |
 |------|------|
@@ -174,7 +174,7 @@ yuque-doc-edit-staged (3-stage workflow)
 
 ### 7.1 Stage-driven active_tools
 
-Tool-Gate 的核心机制是 **active_tools 随 Stage 变化**，而非一次性暴露所有工具。
+Stagewise-Tool-Gate 的核心机制是 **active_tools 随 Stage 变化**，而非一次性暴露所有工具。
 
 | 当前状态 | 有效 Grant | current_stage | 可贡献工具 | 结果 |
 |---------|-----------|---------------|-----------|------|
@@ -289,7 +289,7 @@ SQLite sessions.state_json
 
 ---
 
-## 10. What This Demonstrates About Tool-Gate
+## 10. What This Demonstrates About Stagewise-Tool-Gate
 
 ### 10.1 Stage-first Tool Surface Control
 
@@ -394,7 +394,7 @@ SQLite sessions.state_json
 
 ### 12.2 项目能力总结
 
-Tool-Gate 展示了 **可控、可审计、可恢复** 的 Agent 工具治理能力：
+Stagewise-Tool-Gate 展示了 **可控、可审计、可恢复** 的 Agent 工具治理能力：
 
 1. **可控**: Stage-first 模型让工具暴露跟随 SOP 阶段，terminal stage 阻止非法转移
 2. **可审计**: 完整 audit trail，每次 allow/deny 都有 from_stage/to_stage/error_bucket

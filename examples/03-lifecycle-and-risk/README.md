@@ -8,7 +8,7 @@
 > 如需了解当前 Stage-first Skill governance 流程，请从 [`examples/simulator-demo`](../simulator-demo/) 开始。
 > 不建议新用户使用本样例学习 Stage-first governance。
 
-> 本样例展示 tool-gate 在**长会话**中的能力**回收**与**风险升级**机制。主线围绕 TTL / revoke / disable / 高风险审批 / 审计闭环展开;`refresh_skills` 不在主线(其主场景在[样例 01 的附录](../01-knowledge-link/README.md#附录--refresh_skills-插曲)),本样例仅在末尾做一次辅助复核触发。
+> 本样例展示 stagewise-tool-gate 在**长会话**中的能力**回收**与**风险升级**机制。主线围绕 TTL / revoke / disable / 高风险审批 / 审计闭环展开;`refresh_skills` 不在主线(其主场景在[样例 01 的附录](../01-knowledge-link/README.md#附录--refresh_skills-插曲)),本样例仅在末尾做一次辅助复核触发。
 
 > ⚠️ **Preflight**:本 workspace **不负责**项目安装。先读 [`../QUICKSTART.md`](../QUICKSTART.md)(§1 概念 + wiring / §2 零知识安装 / §7 preflight 自检),按 §2 在**仓库根**完成一次性安装之后再回来跑本样例。workspace 目录仅负责 demo run。
 
@@ -57,7 +57,7 @@ examples/03-lifecycle-and-risk/
 
 ## 0. 业务背景与展示目标
 
-**业务背景**:Alice 下午继续工作,会话已经开了几个小时。早上启用的 `yuque-knowledge-link`(short TTL = 120s)应该早就过期;她顺手还把 `yuque-doc-edit` 也启用着。现在她要清理权限、并尝试一个危险操作(批量删除过期文档)——这个操作预期会被 tool-gate 拦两层:高风险策略审批 + 全局 `blocked_tools`。
+**业务背景**:Alice 下午继续工作,会话已经开了几个小时。早上启用的 `yuque-knowledge-link`(short TTL = 120s)应该早就过期;她顺手还把 `yuque-doc-edit` 也启用着。现在她要清理权限、并尝试一个危险操作(批量删除过期文档)——这个操作预期会被 stagewise-tool-gate 拦两层:高风险策略审批 + 全局 `blocked_tools`。
 
 **展示目标**:
 1. 证明 TTL 到期后,`UserPromptSubmit` 下一轮重算自动把过期技能从 `active_tools` 移除;相关工具尝试被拦
@@ -217,7 +217,7 @@ claude --plugin-dir ../../ --mcp-config ./.mcp.json
 - `active_grants` - 活跃授权
 - `created_at` / `updated_at` - 时间戳
 
-这些日志文件遵循 [`/home/zh/tool-gate/docs/session_logging_prompt.md`](../../docs/session_logging_prompt.md) 中定义的规范。
+这些日志文件遵循 [`/home/zh/stagewise-tool-gate/docs/session_logging_prompt.md`](../../docs/session_logging_prompt.md) 中定义的规范。
 
 ---
 

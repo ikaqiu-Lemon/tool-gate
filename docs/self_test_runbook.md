@@ -116,7 +116,7 @@ python3 --version
 Linux / macOS：
 
 ```
-cd /path/to/tool-gate
+cd /path/to/stagewise-tool-gate
 python3 -m venv .venv
 source .venv/bin/activate
 ```
@@ -124,7 +124,7 @@ source .venv/bin/activate
 Windows PowerShell：
 
 ```
-cd C:\path\to\tool-gate
+cd C:\path\to\stagewise-tool-gate
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
@@ -481,7 +481,7 @@ mypy src
 ### 7.3 完整一次性执行清单（PowerShell）
 
 ```
-cd C:\path\to\tool-gate
+cd C:\path\to\stagewise-tool-gate
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -e ".[dev]"
@@ -503,7 +503,7 @@ python -m pytest -q
 ### Step 1. 以仓库为插件目录启动 Claude Code
 
 ```
-cd /path/to/tool-gate
+cd /path/to/stagewise-tool-gate
 claude --plugin-dir .
 ```
 

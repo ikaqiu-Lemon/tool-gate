@@ -5,7 +5,7 @@
 - **开始时间**: 2026-04-30T15:12:53.859049+00:00
 - **结束时间**: 2026-04-30T15:12:56.885676+00:00
 - **总耗时**: 3.03 秒
-- **工作目录**: /home/zh/tool-gate/examples/03-lifecycle-and-risk
+- **工作目录**: /home/zh/stagewise-tool-gate/examples/03-lifecycle-and-risk
 
 ## 2. 用户请求
 ```

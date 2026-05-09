@@ -158,7 +158,7 @@
 | 角色 | **混杂变量工具** |
 | 输入字段 | `keyword: str, space: str` |
 | 返回字段 | `hits: List[{path, title, snippet}]` |
-| 本样例作用 | 证明多类搜索源同时注册时,tool-gate 只让 SOP 声明的 `yuque_search` 通过;内部 wiki 搜索被 deny |
+| 本样例作用 | 证明多类搜索源同时注册时,stagewise-tool-gate 只让 SOP 声明的 `yuque_search` 通过;内部 wiki 搜索被 deny |
 | Schema | [`search_doc.schema.json`](../schemas/search_doc.schema.json) |
 
 **示例返回**:

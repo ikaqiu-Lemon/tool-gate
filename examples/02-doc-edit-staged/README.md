@@ -8,7 +8,7 @@
 > 如需了解当前 Stage-first Skill governance 流程，请从 [`examples/simulator-demo`](../simulator-demo/) 开始。
 > 不建议新用户使用本样例学习 Stage-first governance。
 
-> 本样例展示 tool-gate 在**中风险 + 需要写入**的场景下如何落地"先理解、再修改"的两阶段工作流,同时通过 `blocked_tools` 演示全局红线。
+> 本样例展示 stagewise-tool-gate 在**中风险 + 需要写入**的场景下如何落地"先理解、再修改"的两阶段工作流,同时通过 `blocked_tools` 演示全局红线。
 
 > ⚠️ **Preflight**:本 workspace **不负责**项目安装。先读 [`../QUICKSTART.md`](../QUICKSTART.md)(§1 概念 + wiring / §2 零知识安装 / §7 preflight 自检),按 §2 在**仓库根**完成一次性安装之后再回来跑本样例。workspace 目录仅负责 demo run。
 
@@ -258,7 +258,7 @@ sqlite3 .demo-data/governance.db "SELECT * FROM audit_log ORDER BY created_at;"
 | `yuque_update_doc` | `mock-yuque` | ● 主业务工具(仅 execution) | [`contracts/yuque_tools_contract.md#yuque_update_doc`](./contracts/yuque_tools_contract.md#yuque_update_doc) |
 | `run_command` | `mock-shell` | ○ **混杂变量工具**,永远被 `blocked_tools` 拦截 | [`contracts/shell_tools_contract.md#run_command`](./contracts/shell_tools_contract.md#run_command) |
 
-> ⚠️ `mock_shell_stdio.py` 是**混杂变量工具**,仅为制造真实工具混杂环境以验证 tool-gate 的拦截能力。它**不代表**本项目支持任意 shell 执行,也不是任何主业务能力。
+> ⚠️ `mock_shell_stdio.py` 是**混杂变量工具**,仅为制造真实工具混杂环境以验证 stagewise-tool-gate 的拦截能力。它**不代表**本项目支持任意 shell 执行,也不是任何主业务能力。
 
 ---
 
@@ -277,7 +277,7 @@ sqlite3 .demo-data/governance.db "SELECT * FROM audit_log ORDER BY created_at;"
 
 ## 8. Session Logging 实现
 
-本样例实现了完整的会话日志记录，符合 `tool-gate/docs/session_logging_prompt.md` 规范。
+本样例实现了完整的会话日志记录，符合 `stagewise-tool-gate/docs/session_logging_prompt.md` 规范。
 
 ### 日志文件
 
